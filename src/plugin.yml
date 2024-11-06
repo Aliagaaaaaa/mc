@@ -1,0 +1,24 @@
+main: lol.aliaga.nuhc.NUHC
+name: nUHC
+version: 1.0
+author: Aliaga
+commands:
+  teamchat:
+  team:
+  sc:
+  uhccode:
+  uhc:
+  loadchunks:
+  start:
+  config:
+  helpop:
+  scenarios:
+  heal:
+  clear:
+  health:
+  clearchat:
+  giveall:
+  world:
+  kt:
+  tele:
+  rules:
