@@ -139,6 +139,7 @@ public class StartCommand implements CommandExecutor {
     }
 
 
+
     private void iniciarPartida() {
         Bukkit.broadcastMessage("¡La partida ha iniciado correctamente!");
         NUHC.getInstance().setGameState(GameState.IN_GAME);
@@ -152,24 +153,37 @@ public class StartCommand implements CommandExecutor {
 
         updateBorder(2000);
 
-        // Reemplazar scheduler.schedule con BukkitRunnable para activar PvP
+        // Cuenta regresiva para el PvP (empezando 15 segundos antes)
+        countdown(NUHC.getInstance().getGameConfig().getPvpTime() * 60 + 15, "El PvP se activará en ", () -> {
+            Bukkit.broadcastMessage("¡El PvP se ha activado!");
+        });
+
+        // Cuenta regresiva para el Final Heal (empezando 15 segundos antes)
+        countdown(NUHC.getInstance().getGameConfig().getFinalHealTime() * 60 + 15, "El Final Heal comenzará en ", () -> {
+            Bukkit.broadcastMessage("¡El Final Heal ha comenzado!");
+        });
+
+        // Cuenta regresiva para la reducción del borde (empezando 15 segundos antes)
+        countdown(15, "El borde comenzará a reducirse en ", () -> {
+            reducirBorde(NUHC.getInstance().getCurrentBorder(), NUHC.getInstance().getGameConfig().getBorderShrinking());
+        });
+    }
+
+    private void countdown(int seconds, String messagePrefix, Runnable action) {
         new BukkitRunnable() {
+            int countdown = seconds;
             @Override
             public void run() {
-                Bukkit.broadcastMessage("Activando pvp");
+                if (countdown == 15 || countdown == 10 || countdown == 5 || countdown <= 4) {
+                    Bukkit.broadcastMessage(messagePrefix + countdown + " segundo" + (countdown == 1 ? "" : "s") + "...");
+                }
+                if (countdown == 0) {
+                    action.run();
+                    this.cancel();
+                }
+                countdown--;
             }
-        }.runTaskLater(NUHC.getInstance(), 20L * 60L * NUHC.getInstance().getGameConfig().getPvpTime()); // 20 ticks por segundo * 60 segundos por minuto * minutos
-
-        // Reemplazar scheduler.schedule con BukkitRunnable para el Final Heal
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                Bukkit.broadcastMessage("Final heal");
-            }
-        }.runTaskLater(NUHC.getInstance(), 20L * 60L * NUHC.getInstance().getGameConfig().getFinalHealTime()); // 20 ticks por segundo * 60 segundos por minuto * minutos
-
-        reducirBorde(NUHC.getInstance().getCurrentBorder(), NUHC.getInstance().getGameConfig().getBorderShrinking());
-
+        }.runTaskTimer(NUHC.getInstance(), 0L, 20L);
     }
 
     private void updateBorder(int radius) {
