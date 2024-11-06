@@ -44,6 +44,8 @@ public class StartCommand implements CommandExecutor {
             return true;
         }
 
+        Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "wb world set " + NUHC.getInstance().getGameConfig().getBorder() + " " + NUHC.getInstance().getGameConfig().getBorder() + " 0 0");
+
         List<Player> jugadores = new ArrayList<>(Bukkit.getOnlinePlayers());
         List<Location> ubicaciones = new ArrayList<>();
         for (int i = 0; i < jugadores.size(); i++) {
@@ -141,6 +143,7 @@ public class StartCommand implements CommandExecutor {
 
 
     private void iniciarPartida() {
+        NUHC.startTimeTask();
         Bukkit.broadcastMessage("¡La partida ha iniciado correctamente!");
         NUHC.getInstance().setGameState(GameState.IN_GAME);
         NUHC.getInstance().setStartTime(System.currentTimeMillis());
@@ -153,20 +156,29 @@ public class StartCommand implements CommandExecutor {
 
         updateBorder(2000);
 
-        // Cuenta regresiva para el PvP (empezando 15 segundos antes)
-        countdown(NUHC.getInstance().getGameConfig().getPvpTime() * 60 + 15, "El PvP se activará en ", () -> {
-            Bukkit.broadcastMessage("¡El PvP se ha activado!");
-        });
+        int pvpTime = NUHC.getInstance().getGameConfig().getPvpTime() * 60;
+        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () ->
+                countdown(15, "El PvP se activará en ", () -> {
+                    Bukkit.broadcastMessage("¡El PvP se ha activado!");
+                }), 20L * (pvpTime - 15)
+        );
 
-        // Cuenta regresiva para el Final Heal (empezando 15 segundos antes)
-        countdown(NUHC.getInstance().getGameConfig().getFinalHealTime() * 60 + 15, "El Final Heal comenzará en ", () -> {
-            Bukkit.broadcastMessage("¡El Final Heal ha comenzado!");
-        });
+        // Cuenta regresiva para el Final Heal (empezando 15 segundos antes del minuto especificado)
+        int finalHealTime = NUHC.getInstance().getGameConfig().getFinalHealTime() * 60;
+        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () ->
+                countdown(15, "El Final Heal comenzará en ", () -> {
+                    Bukkit.broadcastMessage("¡El Final Heal ha comenzado!");
+                }), 20L * (finalHealTime - 15)
+        );
 
         // Cuenta regresiva para la reducción del borde (empezando 15 segundos antes)
-        countdown(15, "El borde comenzará a reducirse en ", () -> {
-            reducirBorde(NUHC.getInstance().getCurrentBorder(), NUHC.getInstance().getGameConfig().getBorderShrinking());
-        });
+        int borderTime = NUHC.getInstance().getGameConfig().getBorderShrinking() * 60; //60 segundos
+        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () ->
+                countdown(15, "El borde comenzará a reducirse en ", () -> {
+                    reducirBorde(NUHC.getInstance().getCurrentBorder(), NUHC.getInstance().getGameConfig().getBorderShrinking());
+                }), 20L * (borderTime - 15)
+        );
+
     }
 
     private void countdown(int seconds, String messagePrefix, Runnable action) {
@@ -367,8 +379,10 @@ public class StartCommand implements CommandExecutor {
 
     private void reducirBorde(int borde, int tiempo) {
         int[] bordes = {3000, 2000, 1500, 1000, 500, 250, 100, 50};
-        int currentBorderIndex = IntStream.range(0, bordes.length).filter(i -> bordes[i] == borde).findFirst().orElse(-1);
-        System.out.println(currentBorderIndex);
+        int currentBorderIndex = IntStream.range(0, bordes.length)
+                .filter(i -> bordes[i] == borde)
+                .findFirst()
+                .orElse(-1);
 
         if (currentBorderIndex == -1) {
             System.out.println("El borde no está en la lista de bordes permitidos.");
@@ -380,17 +394,20 @@ public class StartCommand implements CommandExecutor {
             return;
         }
 
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                int nuevoBorde = bordes[currentBorderIndex + 1];
-                NUHC.getInstance().setCurrentBorder(bordes[currentBorderIndex + 1]);
-                updateBorder(nuevoBorde);
-                System.out.println("Borde reducido a: " + nuevoBorde);
+        // Calcular el tiempo de retraso para la siguiente reducción
+        long delay = 20L * (60L * tiempo-15);
 
-                reducirBorde(nuevoBorde, 1);
-            }
-        }.runTaskLater(NUHC.getInstance(), 20L * 60L * tiempo); // 20 ticks por segundo * 60 segundos por minuto * minutos
+        // Programar la siguiente reducción con countdown
+        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () ->
+                countdown(15, "El borde comenzará a reducirse en ", () -> {
+                    int nuevoBorde = bordes[currentBorderIndex + 1];
+                    NUHC.getInstance().setCurrentBorder(nuevoBorde);
+                    updateBorder(nuevoBorde);
+                    System.out.println("Borde reducido a: " + nuevoBorde);
+
+                    // Llamar recursivamente a reducirBorde para la siguiente reducción
+                    reducirBorde(nuevoBorde, tiempo);
+                }), delay);
     }
 
 

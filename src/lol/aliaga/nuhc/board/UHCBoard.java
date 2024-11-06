@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class UHCBoard implements AssembleAdapter {
+
     @Override
     public String getTitle(Player player) {
         return ChatColor.AQUA + "" + ChatColor.BOLD +"Budas UHC";
@@ -57,7 +58,7 @@ public class UHCBoard implements AssembleAdapter {
 
             case IN_GAME:
                 toReturn.add(ChatColor.GRAY + ChatColor.STRIKETHROUGH.toString() + "-------------------");
-                toReturn.add(ChatColor.GREEN + "Game Time: " + ChatColor.WHITE + parseTime(System.currentTimeMillis() - NUHC.getInstance().getStartTime()));
+                toReturn.add(ChatColor.GREEN + "Game Time: " + ChatColor.WHITE + parseTime(NUHC.seconds));
                 toReturn.add("");
                 toReturn.add(ChatColor.GREEN + "Your Kills: " + ChatColor.WHITE + NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId()).getStats().getKills());
                 if(NUHC.getInstance().getGameConfig().getTeams() != 1){
@@ -84,15 +85,14 @@ public class UHCBoard implements AssembleAdapter {
         return toReturn;
     }
 
-    public static String parseTime(long millis) {
-        long seconds = millis / 1000;
+    public static String parseTime(long seconds) {  // Cambiado el parámetro a 'seconds'
 
         if (seconds < 60) {
-            return String.format("%.1fs", (double) millis / 1000);
+            return String.format("00:00:%02d", seconds); // Añadido formato hh:mm:ss
         } else if (seconds < 3600) {
             long minutes = seconds / 60;
             long remainingSeconds = seconds % 60;
-            return String.format("%02d:%02d", minutes, remainingSeconds);
+            return String.format("00:%02d:%02d", minutes, remainingSeconds); // Añadido formato hh:mm:ss
         } else {
             long hours = seconds / 3600;
             long remainingMinutes = (seconds % 3600) / 60;

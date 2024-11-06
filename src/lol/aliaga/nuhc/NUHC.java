@@ -20,6 +20,7 @@ import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.UUID;
 
@@ -51,6 +52,30 @@ public class NUHC extends JavaPlugin {
         registerCommands();
         setupScoreboard();
     }
+
+    public static long seconds = 0;
+    public static BukkitRunnable timeTask;
+
+
+    public static void startTimeTask() {
+        if (timeTask != null) {
+            timeTask.cancel(); // Cancelar la tarea anterior si existe
+        }
+        timeTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (instance.getGameState() == GameState.IN_GAME) {
+                    seconds++;
+                } else {
+                    this.cancel();
+                    timeTask = null;
+                    seconds = 0;
+                }
+            }
+        };
+        timeTask.runTaskTimer(instance, 0L, 20L);
+    }
+
 
     @Override
     public void onDisable() {
