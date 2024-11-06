@@ -2,6 +2,7 @@ package lol.aliaga.nuhc.commands;
 
 import lol.aliaga.nuhc.NUHC;
 import lol.aliaga.nuhc.game.GameState;
+import lol.aliaga.nuhc.player.UHCPlayerState;
 import lol.aliaga.nuhc.scenarios.Scenario;
 import net.minecraft.server.v1_8_R3.NBTTagCompound;
 import org.bukkit.Bukkit;
@@ -143,7 +144,7 @@ public class StartCommand implements CommandExecutor {
 
 
     private void iniciarPartida() {
-        NUHC.startTimeTask();
+        startTimeTask();
         Bukkit.broadcastMessage("¡La partida ha iniciado correctamente!");
         NUHC.getInstance().setGameState(GameState.IN_GAME);
         NUHC.getInstance().setStartTime(System.currentTimeMillis());
@@ -155,29 +156,6 @@ public class StartCommand implements CommandExecutor {
         }
 
         updateBorder(2000);
-
-        int pvpTime = NUHC.getInstance().getGameConfig().getPvpTime() * 60;
-        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () ->
-                countdown(15, "El PvP se activará en ", () -> {
-                    Bukkit.broadcastMessage("¡El PvP se ha activado!");
-                }), 20L * (pvpTime - 15)
-        );
-
-        // Cuenta regresiva para el Final Heal (empezando 15 segundos antes del minuto especificado)
-        int finalHealTime = NUHC.getInstance().getGameConfig().getFinalHealTime() * 60;
-        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () ->
-                countdown(15, "El Final Heal comenzará en ", () -> {
-                    Bukkit.broadcastMessage("¡El Final Heal ha comenzado!");
-                }), 20L * (finalHealTime - 15)
-        );
-
-        // Cuenta regresiva para la reducción del borde (empezando 15 segundos antes)
-        int borderTime = NUHC.getInstance().getGameConfig().getBorderShrinking() * 60; //60 segundos
-        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () ->
-                countdown(15, "El borde comenzará a reducirse en ", () -> {
-                    reducirBorde(NUHC.getInstance().getCurrentBorder(), NUHC.getInstance().getGameConfig().getBorderShrinking());
-                }), 20L * (borderTime - 15)
-        );
 
     }
 
@@ -197,6 +175,10 @@ public class StartCommand implements CommandExecutor {
             }
         }.runTaskTimer(NUHC.getInstance(), 0L, 20L);
     }
+
+    public static long seconds = 0;
+    public static BukkitRunnable timeTask;
+
 
     private void updateBorder(int radius) {
         System.out.println(radius+"aaa");
@@ -377,37 +359,100 @@ public class StartCommand implements CommandExecutor {
         }.runTask(NUHC.getInstance());
     }
 
-    private void reducirBorde(int borde, int tiempo) {
-        int[] bordes = {3000, 2000, 1500, 1000, 500, 250, 100, 50};
-        int currentBorderIndex = IntStream.range(0, bordes.length)
-                .filter(i -> bordes[i] == borde)
+    public void startTimeTask() {
+        if (timeTask != null) {
+            timeTask.cancel();
+        }
+
+        final int[] bordes = {3000, 2000, 1500, 1000, 500, 250, 100, 50};
+        int initialBorder = NUHC.getInstance().getGameConfig().getBorder();
+
+        // Encontrar el índice del borde inicial en el array 'bordes'
+        final int[] currentBorderIndex = {IntStream.range(0, bordes.length)
+                .filter(i -> bordes[i] == initialBorder)
                 .findFirst()
-                .orElse(-1);
+                .orElse(0) + 1} ; // Si no se encuentra, empezar en el índice 0
 
-        if (currentBorderIndex == -1) {
-            System.out.println("El borde no está en la lista de bordes permitidos.");
+        int borderShrinkingTime = NUHC.getInstance().getGameConfig().getBorderShrinking() * 60; // Tiempo inicial en segundos
+        final int[] nextBorderTime = {borderShrinkingTime}; // Tiempo para la primera reducción
+
+        timeTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (NUHC.getInstance().getGameState() == GameState.IN_GAME) {
+                    seconds++;
+
+                    int pvpTime = NUHC.getInstance().getGameConfig().getPvpTime() * 60;
+                    if (seconds == pvpTime - 15 || seconds == pvpTime - 10 || seconds == pvpTime - 5 || (seconds <= pvpTime - 1 && seconds > pvpTime - 15)) {
+                        Bukkit.broadcastMessage("El PvP se activará en " + (pvpTime - seconds) + " segundo" + ((pvpTime - seconds) == 1 ? "" : "s") + "...");
+                    }
+
+                    if (seconds == pvpTime) {
+                        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () -> {
+                            Bukkit.broadcastMessage("¡El PvP se ha activado!");
+                            // Activar el PvP en el mundo "world"
+                            World world = Bukkit.getWorld("world");
+                            if (world != null) {
+                                world.setPVP(true);
+                            }
+                        }, 20L);
+                    }
+
+                    int finalHealTime = NUHC.getInstance().getGameConfig().getFinalHealTime() * 60;
+                    if (seconds == finalHealTime - 15 || seconds == finalHealTime - 10 || seconds == finalHealTime - 5 || (seconds <= finalHealTime - 1 && seconds > finalHealTime - 15)) {
+                        Bukkit.broadcastMessage("El Final Heal comenzará en " + (finalHealTime - seconds) + " segundo" + ((finalHealTime - seconds) == 1 ? "" : "s") + "...");
+                    }
+
+                    if (seconds == finalHealTime) {
+                        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () -> {
+                            Bukkit.broadcastMessage("¡El Final Heal ha comenzado!");
+                            // Curar a todos los jugadores
+                            for (Player player : Bukkit.getOnlinePlayers()) {
+                                if (NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId()).getState() == UHCPlayerState.PLAYER) {
+                                    player.setHealth(player.getMaxHealth());
+                                    player.setFoodLevel(20);
+                                    player.setFireTicks(0); // Apagar el fuego si está en llamas
+                                }
+                            }
+                        }, 20L);
+                    }
+
+                    if (seconds == nextBorderTime[0] - 15 || seconds == nextBorderTime[0] - 10 || seconds == nextBorderTime[0] - 5 || (seconds <= nextBorderTime[0] - 1 && seconds > nextBorderTime[0] - 15)) {
+                        Bukkit.broadcastMessage("El borde comenzará a reducirse en " + (nextBorderTime[0] - seconds) + " segundo" + ((nextBorderTime[0] - seconds) == 1 ? "" : "s") + "...");
+                    }
+
+                    if (seconds >= nextBorderTime[0] && currentBorderIndex[0] < bordes.length) {
+                        int nuevoBorde = bordes[currentBorderIndex[0]];
+                        Bukkit.getScheduler().runTask(NUHC.getInstance(), () -> {
+                            reducirBorde(nuevoBorde);
+                            Bukkit.broadcastMessage("El borde se ha reducido a " + nuevoBorde + " bloques.");
+                        });
+
+                        currentBorderIndex[0]++;
+                        // Calcular el tiempo para la siguiente reducción (1 minuto = 60 segundos)
+                        nextBorderTime[0] += 60 * 5;
+                    }
+
+                } else {
+                    this.cancel();
+                    timeTask = null;
+                    seconds = 0;
+                }
+            }
+        };
+        timeTask.runTaskTimer(NUHC.getInstance(), 0L, 20L);
+    }
+
+    private void reducirBorde(int nuevoRadio) {
+        World world = Bukkit.getWorld("world");
+        if (world == null) {
             return;
         }
 
-        if (currentBorderIndex == bordes.length - 1) {
-            System.out.println("El borde ya es el más pequeño.");
-            return;
-        }
+        Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "wb world set " + nuevoRadio + " " + nuevoRadio + " 0 0");
+        updateBorder(nuevoRadio);
+        NUHC.getInstance().setCurrentBorder(nuevoRadio);
 
-        // Calcular el tiempo de retraso para la siguiente reducción
-        long delay = 20L * (60L * tiempo-15);
-
-        // Programar la siguiente reducción con countdown
-        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () ->
-                countdown(15, "El borde comenzará a reducirse en ", () -> {
-                    int nuevoBorde = bordes[currentBorderIndex + 1];
-                    NUHC.getInstance().setCurrentBorder(nuevoBorde);
-                    updateBorder(nuevoBorde);
-                    System.out.println("Borde reducido a: " + nuevoBorde);
-
-                    // Llamar recursivamente a reducirBorde para la siguiente reducción
-                    reducirBorde(nuevoBorde, tiempo);
-                }), delay);
     }
 
 

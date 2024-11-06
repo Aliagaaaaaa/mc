@@ -2,6 +2,7 @@ package lol.aliaga.nuhc.board;
 
 import io.github.thatkawaiisam.assemble.AssembleAdapter;
 import lol.aliaga.nuhc.NUHC;
+import lol.aliaga.nuhc.commands.StartCommand;
 import lol.aliaga.nuhc.scenarios.Scenario;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -58,7 +59,7 @@ public class UHCBoard implements AssembleAdapter {
 
             case IN_GAME:
                 toReturn.add(ChatColor.GRAY + ChatColor.STRIKETHROUGH.toString() + "-------------------");
-                toReturn.add(ChatColor.GREEN + "Game Time: " + ChatColor.WHITE + parseTime(NUHC.seconds));
+                toReturn.add(ChatColor.GREEN + "Game Time: " + ChatColor.WHITE + parseTime(StartCommand.seconds));
                 toReturn.add("");
                 toReturn.add(ChatColor.GREEN + "Your Kills: " + ChatColor.WHITE + NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId()).getStats().getKills());
                 if(NUHC.getInstance().getGameConfig().getTeams() != 1){
