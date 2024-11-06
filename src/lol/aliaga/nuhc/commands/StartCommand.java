@@ -152,15 +152,24 @@ public class StartCommand implements CommandExecutor {
 
         updateBorder(2000);
 
-        scheduler.schedule(() -> {
-            Bukkit.broadcastMessage("Activando pvp");
-        }, NUHC.getInstance().getGameConfig().getPvpTime(), TimeUnit.MINUTES);
+        // Reemplazar scheduler.schedule con BukkitRunnable para activar PvP
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                Bukkit.broadcastMessage("Activando pvp");
+            }
+        }.runTaskLater(NUHC.getInstance(), 20L * 60L * NUHC.getInstance().getGameConfig().getPvpTime()); // 20 ticks por segundo * 60 segundos por minuto * minutos
 
-        scheduler.schedule(() -> {
-            Bukkit.broadcastMessage("Final heal");
-        }, NUHC.getInstance().getGameConfig().getFinalHealTime(), TimeUnit.MINUTES);
+        // Reemplazar scheduler.schedule con BukkitRunnable para el Final Heal
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                Bukkit.broadcastMessage("Final heal");
+            }
+        }.runTaskLater(NUHC.getInstance(), 20L * 60L * NUHC.getInstance().getGameConfig().getFinalHealTime()); // 20 ticks por segundo * 60 segundos por minuto * minutos
 
         reducirBorde(NUHC.getInstance().getCurrentBorder(), NUHC.getInstance().getGameConfig().getBorderShrinking());
+
     }
 
     private void updateBorder(int radius) {
@@ -357,14 +366,17 @@ public class StartCommand implements CommandExecutor {
             return;
         }
 
-        scheduler.schedule(() -> {
-            int nuevoBorde = bordes[currentBorderIndex + 1];
-            NUHC.getInstance().setCurrentBorder(bordes[currentBorderIndex + 1]);
-            updateBorder(nuevoBorde);
-            System.out.println("Borde reducido a: " + nuevoBorde);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                int nuevoBorde = bordes[currentBorderIndex + 1];
+                NUHC.getInstance().setCurrentBorder(bordes[currentBorderIndex + 1]);
+                updateBorder(nuevoBorde);
+                System.out.println("Borde reducido a: " + nuevoBorde);
 
-            reducirBorde(nuevoBorde, 1);
-        }, tiempo, TimeUnit.MINUTES);
+                reducirBorde(nuevoBorde, 1);
+            }
+        }.runTaskLater(NUHC.getInstance(), 20L * 60L * tiempo); // 20 ticks por segundo * 60 segundos por minuto * minutos
     }
 
 
