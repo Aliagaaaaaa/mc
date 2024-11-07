@@ -8,6 +8,7 @@ import lol.aliaga.nuhc.player.UHCPlayerState;
 import lol.aliaga.nuhc.scenarios.Scenario;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.GameMode;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -18,40 +19,54 @@ public class UHCCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender commandSender, Command command, String label, String[] args) {
-        if (commandSender instanceof Player) {
-            Player player = (Player) commandSender;
-            if (player.hasPermission("uhc.command")) {
-                if (args.length == 0) {
-                    sendUsageMessage(player);
-                } else if (args[0].equalsIgnoreCase("setupfinish")) {
-                    handleSetupFinish(player);
-                } else if (args[0].equalsIgnoreCase("host")) {
-                    handleHostCommand(player, args);
-                } else if (args[0].equalsIgnoreCase("admin")) {
-                    handleAdminCommand(player, args);
-                } else if (args[0].equalsIgnoreCase("spectator") || args[0].equalsIgnoreCase("spec")) {
-                    handleSpectatorCommand(player, args);
-                } else if (args[0].equalsIgnoreCase("edit")) {
-                    handleEditCommand(player, args);
-                } else {
-                    player.sendMessage(ChatColor.RED + "Unknown command or invalid syntax.");
-                }
-            } else {
-                player.sendMessage(ChatColor.RED + "You don't have permission to use this command!");
-            }
-        } else {
+        if (!(commandSender instanceof Player)) {
             commandSender.sendMessage(ChatColor.RED + "Console cannot use this command!");
+            return true;
         }
-        return false;
+
+        Player player = (Player) commandSender;
+
+        if (!player.hasPermission("uhc.command")) {
+            player.sendMessage(ChatColor.RED + "You don't have permission to use this command!");
+            return true;
+        }
+
+        if (args.length == 0) {
+            sendUsageMessage(player);
+            return true;
+        }
+
+        switch (args[0].toLowerCase()) {
+            case "setupfinish":
+                handleSetupFinish(player);
+                break;
+            case "host":
+                handleHostCommand(player, args);
+                break;
+            case "admin":
+                handleAdminCommand(player, args);
+                break;
+            case "spectator":
+            case "spec":
+                handleSpectatorCommand(player, args);
+                break;
+            case "edit":
+                handleEditCommand(player, args);
+                break;
+            default:
+                player.sendMessage(ChatColor.RED + "Unknown command or invalid syntax.");
+        }
+
+        return true;
     }
 
     private void sendUsageMessage(Player player) {
         player.sendMessage(ChatColor.GREEN + "Usage:");
-        player.sendMessage(ChatColor.GREEN + "/uhc host <player> - Set a player as host");
-        player.sendMessage(ChatColor.GREEN + "/uhc admin <player> - Set a player as admin");
-        player.sendMessage(ChatColor.GREEN + "/uhc spectator <player> - Set a player as spectator");
-        player.sendMessage(ChatColor.GREEN + "/uhc edit <option> <value> - Edit game configuration");
-        player.sendMessage(ChatColor.GREEN + "/uhc setupfinish - Check for configuration inconsistencies and set the game to waiting start");
+        player.sendMessage(ChatColor.GREEN + "/uhc host <player> " + ChatColor.GRAY + "Set a player as host");
+        player.sendMessage(ChatColor.GREEN + "/uhc admin <player> " + ChatColor.GRAY + "Set a player as admin");
+        player.sendMessage(ChatColor.GREEN + "/uhc spectator <player> " + ChatColor.GRAY + "Set a player as spectator");
+        player.sendMessage(ChatColor.GREEN + "/uhc edit <option> <value> " + ChatColor.GRAY + "Edit game configuration");
+        player.sendMessage(ChatColor.GREEN + "/uhc setupfinish " + ChatColor.GRAY + "Check configuration and set game to waiting start");
     }
 
     private void handleSetupFinish(Player player) {
@@ -70,23 +85,19 @@ public class UHCCommand implements CommandExecutor {
             }
         }
 
-        if (!hasErrors) {
-            player.sendMessage(ChatColor.GREEN + "UHC setup is ready! Changing gamestate to WAITING_START");
-            NUHC.getInstance().setGameState(GameState.WAITING_START);
-        } else {
+        if (hasErrors) {
             player.sendMessage(ChatColor.RED + "There are configuration issues that need to be resolved.");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "UHC setup is ready! Changing game state to " + ChatColor.WHITE + "WAITING_START");
+            NUHC.getInstance().setGameState(GameState.WAITING_START);
         }
     }
 
     private void handleHostCommand(Player player, String[] args) {
         if (args.length == 1) {
-            UHCPlayer uhcPlayer = NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId());
-            if (uhcPlayer != null) {
-                uhcPlayer.setState(UHCPlayerState.HOST);
-                player.sendMessage(ChatColor.GREEN + "You are now host of the match");
-            }
+            setPlayerRole(player, player.getName(), UHCPlayerState.HOST, "host");
         } else if (args.length == 2) {
-            setPlayerState(player, args[1], UHCPlayerState.HOST, "host");
+            setPlayerRole(player, args[1], UHCPlayerState.HOST, "host");
         } else {
             player.sendMessage(ChatColor.RED + "Usage: /uhc host <player>");
         }
@@ -94,13 +105,9 @@ public class UHCCommand implements CommandExecutor {
 
     private void handleAdminCommand(Player player, String[] args) {
         if (args.length == 1) {
-            UHCPlayer uhcPlayer = NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId());
-            if (uhcPlayer != null) {
-                uhcPlayer.setState(UHCPlayerState.HOST);
-                player.sendMessage(ChatColor.GREEN + "You are now admin of the match");
-            }
+            setPlayerRole(player, player.getName(), UHCPlayerState.ADMIN, "admin");
         } else if (args.length == 2) {
-            setPlayerState(player, args[1], UHCPlayerState.HOST, "admin");
+            setPlayerRole(player, args[1], UHCPlayerState.ADMIN, "admin");
         } else {
             player.sendMessage(ChatColor.RED + "Usage: /uhc admin <player>");
         }
@@ -108,40 +115,52 @@ public class UHCCommand implements CommandExecutor {
 
     private void handleSpectatorCommand(Player player, String[] args) {
         if (args.length == 1) {
-            UHCPlayer uhcPlayer = NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId());
-            if (uhcPlayer != null) {
-                uhcPlayer.setState(UHCPlayerState.SPECTATOR);
-                player.sendMessage(ChatColor.GREEN + "You are now spectator of the match");
-            }
+            setPlayerRole(player, player.getName(), UHCPlayerState.SPECTATOR, "spectator");
         } else if (args.length == 2) {
-            setPlayerState(player, args[1], UHCPlayerState.SPECTATOR, "spectator");
+            setPlayerRole(player, args[1], UHCPlayerState.SPECTATOR, "spectator");
         } else {
             player.sendMessage(ChatColor.RED + "Usage: /uhc spectator <player>");
         }
     }
 
-    private void setPlayerState(Player player, String targetName, UHCPlayerState state, String role) {
+    private void setPlayerRole(Player player, String targetName, UHCPlayerState state, String role) {
         OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(targetName);
-        if (offlinePlayer != null) {
-            UHCPlayer target = NUHC.getInstance().getUhcPlayerManager().getPlayer(offlinePlayer.getUniqueId());
-            if (target == null) {
-                NUHC.getInstance().getUhcPlayerManager().createPlayer(offlinePlayer.getUniqueId());
-            }
+        UHCPlayer target = NUHC.getInstance().getUhcPlayerManager().getPlayer(offlinePlayer.getUniqueId());
 
-            target = NUHC.getInstance().getUhcPlayerManager().getPlayer(offlinePlayer.getUniqueId());
-            target.setState(state);
-            player.sendMessage(ChatColor.GREEN + offlinePlayer.getName() + " is now " + role + " of the match");
-            if (offlinePlayer.isOnline()) {
-                offlinePlayer.getPlayer().sendMessage(ChatColor.GREEN + "You are now " + role + " of the match");
-            }
-        } else {
+        if (target == null) {
             player.sendMessage(ChatColor.RED + "That player never joined the server!");
+            return;
+        }
+
+        target.setState(state);
+        player.sendMessage(ChatColor.GREEN + offlinePlayer.getName() + " is now " + ChatColor.WHITE + role + ChatColor.GREEN + " of the match");
+
+        if (offlinePlayer.isOnline()) {
+            Player onlineTarget = offlinePlayer.getPlayer();
+            setSpectatorSettings(onlineTarget, state, role);
+        }
+    }
+
+    private void setSpectatorSettings(Player player, UHCPlayerState state, String role) {
+        if (state == UHCPlayerState.SPECTATOR || state == UHCPlayerState.SPECTATOR_DEATH) {
+            player.setGameMode(GameMode.SPECTATOR);
+            player.setAllowFlight(true);
+            player.setFlying(true);
+            player.sendMessage(ChatColor.YELLOW + "You are in spectator mode as " + role + ".");
+        } else if (state == UHCPlayerState.HOST || state == UHCPlayerState.ADMIN) {
+            player.setGameMode(GameMode.SURVIVAL);
+            player.setAllowFlight(true);
+            player.setFlying(true);
+            player.sendMessage(ChatColor.YELLOW + "You have been set as " + role + " with fly enabled.");
+        } else {
+            player.setGameMode(GameMode.SURVIVAL);
+            player.setAllowFlight(false);
+            player.setFlying(false);
+            player.sendMessage(ChatColor.YELLOW + "You are in player mode.");
         }
     }
 
     private void handleEditCommand(Player player, String[] args) {
-        GameConfig config = NUHC.getInstance().getGameConfig();
-
         if (args.length < 3) {
             player.sendMessage(ChatColor.RED + "Usage: /uhc edit <option> <value>");
             return;
@@ -149,68 +168,69 @@ public class UHCCommand implements CommandExecutor {
 
         String option = args[1];
         String value = args[2];
+        GameConfig config = NUHC.getInstance().getGameConfig();
 
         try {
             switch (option.toLowerCase()) {
                 case "teams":
                     config.setTeams(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "Teams set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Teams set to " + ChatColor.WHITE + value);
                     break;
                 case "border":
                     config.setBorder(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "Border set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Border set to " + ChatColor.WHITE + value);
                     break;
                 case "pvptime":
                     config.setPvpTime(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "PvP time set to " + value + " minutes");
+                    player.sendMessage(ChatColor.GREEN + "PvP time set to " + ChatColor.WHITE + value + ChatColor.GREEN + " minutes");
                     break;
                 case "finalhealtime":
                     config.setFinalHealTime(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "Final heal time set to " + value + " minutes");
+                    player.sendMessage(ChatColor.GREEN + "Final heal time set to " + ChatColor.WHITE + value + ChatColor.GREEN + " minutes");
                     break;
                 case "enderpearl":
                     config.setEnderpearl(Boolean.parseBoolean(value));
-                    player.sendMessage(ChatColor.GREEN + "Enderpearl usage set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Enderpearl usage set to " + ChatColor.WHITE + value);
                     break;
                 case "speed":
                     config.setSpeed(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "Speed set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Speed set to " + ChatColor.WHITE + value);
                     break;
                 case "strength":
                     config.setStrength(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "Strength set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Strength set to " + ChatColor.WHITE + value);
                     break;
                 case "poison":
                     config.setPoison(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "Poison set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Poison set to " + ChatColor.WHITE + value);
                     break;
                 case "applerate":
                     config.setAppleRate(Float.parseFloat(value));
-                    player.sendMessage(ChatColor.GREEN + "Apple rate set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Apple rate set to " + ChatColor.WHITE + value);
                     break;
                 case "nether":
                     config.setNether(Boolean.parseBoolean(value));
-                    player.sendMessage(ChatColor.GREEN + "Nether usage set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Nether usage set to " + ChatColor.WHITE + value);
                     break;
                 case "bordershrinking":
                     config.setBorderShrinking(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "Border shrinking time set to " + value + " minutes");
+                    player.sendMessage(ChatColor.GREEN + "Border shrinking time set to " + ChatColor.WHITE + value + ChatColor.GREEN + " minutes");
                     break;
                 case "flintrate":
                     config.setFlintRate(Float.parseFloat(value));
-                    player.sendMessage(ChatColor.GREEN + "Flint rate set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Flint rate set to " + ChatColor.WHITE + value);
                     break;
                 case "maxplayers":
                     config.setMaxPlayers(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "Max players set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Max players set to " + ChatColor.WHITE + value);
                     break;
                 case "practice":
                     config.setPractice(Boolean.parseBoolean(value));
-                    player.sendMessage(ChatColor.GREEN + "Practice mode set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Practice mode set to " + ChatColor.WHITE + value);
                     break;
                 case "netherborder":
                     config.setNetherBorder(Integer.parseInt(value));
-                    player.sendMessage(ChatColor.GREEN + "Nether border set to " + value);
+                    player.sendMessage(ChatColor.GREEN + "Nether border set to " + ChatColor.WHITE + value);
                     break;
                 default:
                     player.sendMessage(ChatColor.RED + "Unknown option: " + option);

@@ -19,11 +19,13 @@ import java.util.List;
 
 public class AddScenarioMenu implements Listener {
 
+    // Método para abrir el menú de añadir escenarios
     public void openMenu(Player player) {
         List<Scenario> availableScenarios = getAvailableScenarios();
-        int size = Math.max(9, (int) Math.ceil(availableScenarios.size() / 9.0) * 9); // Asegurar al menos 9 slots
+        int size = Math.max(9, (int) Math.ceil(availableScenarios.size() / 9.0) * 9); // Mínimo de 9 slots
         Inventory menu = Bukkit.createInventory(null, size, ChatColor.GREEN + "Add Scenarios");
 
+        // Añadir escenarios disponibles al menú
         for (Scenario scenario : availableScenarios) {
             ItemStack item = createScenarioItem(scenario);
             menu.addItem(item);
@@ -32,6 +34,7 @@ public class AddScenarioMenu implements Listener {
         player.openInventory(menu);
     }
 
+    // Crear un ítem del escenario con meta para el menú
     private ItemStack createScenarioItem(Scenario scenario) {
         ItemStack item = new ItemStack(scenario.getIcon());
         ItemMeta meta = item.getItemMeta();
@@ -43,24 +46,23 @@ public class AddScenarioMenu implements Listener {
         return item;
     }
 
+    // Obtener la lista de escenarios disponibles para añadir
     private List<Scenario> getAvailableScenarios() {
         List<Scenario> allScenarios = NUHC.getInstance().getScenarioManager().getAllScenarios();
         List<Scenario> activeScenarios = NUHC.getInstance().getGameConfig().getScenarios();
         List<Scenario> availableScenarios = new ArrayList<>(allScenarios);
-
-        // Eliminar los escenarios activos de la lista de disponibles
         availableScenarios.removeAll(activeScenarios);
-
         return availableScenarios;
     }
 
+    // Evento para manejar el clic en el inventario de añadir escenarios
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!ChatColor.stripColor(event.getView().getTitle()).equals("Add Scenarios")) {
             return;
         }
-        event.setCancelled(true);
 
+        event.setCancelled(true);
         Player player = (Player) event.getWhoClicked();
         ItemStack clickedItem = event.getCurrentItem();
         if (clickedItem == null || !clickedItem.hasItemMeta()) {
@@ -70,10 +72,10 @@ public class AddScenarioMenu implements Listener {
         String scenarioName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
         Scenario scenario = NUHC.getInstance().getScenarioManager().getScenario(scenarioName);
 
+        // Añadir escenario seleccionado y enviar mensaje de confirmación
         if (scenario != null) {
-            // Añadir el escenario a los activos
-            NUHC.getInstance().getGameConfig().getScenarios().add(scenario);
-            player.sendMessage(ChatColor.GREEN + "Scenario " + scenario.getName() + " has been added!");
+            NUHC.getInstance().getGameConfig().addScenario(scenario);
+            player.sendMessage(ChatColor.GREEN + "Scenario " + ChatColor.AQUA + scenario.getName() + ChatColor.GREEN + " has been added!");
             player.closeInventory();
         }
     }

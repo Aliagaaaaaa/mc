@@ -3,41 +3,38 @@ package lol.aliaga.nuhc.player.stats;
 import lol.aliaga.nuhc.NUHC;
 import lol.aliaga.nuhc.player.UHCPlayer;
 import org.bukkit.Material;
-import org.bukkit.entity.Arrow;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Horse;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Arrow;
+import org.bukkit.entity.Horse;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
-import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.inventory.ItemStack;
 
 public class StatsListener implements Listener {
 
     @EventHandler
     public void onBlockBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
-        Material blockType = event.getBlock().getType();
         UHCPlayer uhcPlayer = NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId());
+        Material blockType = event.getBlock().getType();
 
         switch (blockType) {
             case DIAMOND_ORE:
-                uhcPlayer.getStats().addMiningEvent("Diamond", 1);
+                uhcPlayer.getStats().incrementStat(StatType.MINING_DIAMOND, 1);
+                uhcPlayer.getStats().recordAction("Mining", "Diamond", 1);
                 break;
             case GOLD_ORE:
-                uhcPlayer.getStats().addMiningEvent("Gold", 1);
+                uhcPlayer.getStats().incrementStat(StatType.MINING_GOLD, 1);
+                uhcPlayer.getStats().recordAction("Mining", "Gold", 1);
                 break;
             case IRON_ORE:
-                uhcPlayer.getStats().addMiningEvent("Iron", 1);
-                break;
-            case LAPIS_ORE:
-                uhcPlayer.getStats().addMiningEvent("Lapis Lazuli", 1);
-                break;
-            case QUARTZ_ORE:
-                uhcPlayer.getStats().addMiningEvent("Quartz", 1);
+                uhcPlayer.getStats().incrementStat(StatType.MINING_IRON, 1);
+                uhcPlayer.getStats().recordAction("Mining", "Iron", 1);
                 break;
             default:
                 break;
@@ -49,33 +46,23 @@ public class StatsListener implements Listener {
         if (event.getDamager() instanceof Player && event.getEntity() instanceof Player) {
             Player damager = (Player) event.getDamager();
             Player target = (Player) event.getEntity();
-
             UHCPlayer uhcDamager = NUHC.getInstance().getUhcPlayerManager().getPlayer(damager.getUniqueId());
             UHCPlayer uhcTarget = NUHC.getInstance().getUhcPlayerManager().getPlayer(target.getUniqueId());
 
-            uhcDamager.getStats().addDamageDealt(target.getName(), event.getFinalDamage());
-            uhcTarget.getStats().addDamageTaken(damager.getName(), event.getFinalDamage());
+            uhcDamager.getStats().incrementStat(StatType.DAMAGE_DEALT, (int) event.getFinalDamage());
+            uhcDamager.getStats().recordAction("Damage", "Damage to " + target.getName(), (int) event.getFinalDamage());
+
+            uhcTarget.getStats().incrementStat(StatType.DAMAGE_TAKEN, (int) event.getFinalDamage());
+            uhcTarget.getStats().recordAction("Damage", "Damage received from " + damager.getName(), (int) event.getFinalDamage());
         }
     }
 
     @EventHandler
     public void onEntityShootBow(EntityShootBowEvent event) {
-        if (event.getEntity() instanceof Player && event.getProjectile() instanceof Arrow) {
+        if (event.getEntity() instanceof Player) {
             Player player = (Player) event.getEntity();
             UHCPlayer uhcPlayer = NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId());
-            uhcPlayer.getStats().addArrowShot();
-        }
-    }
-
-    @EventHandler
-    public void onArrowHit(EntityDamageByEntityEvent event) {
-        if (event.getDamager() instanceof Arrow && event.getEntity() instanceof Player) {
-            Arrow arrow = (Arrow) event.getDamager();
-            if (arrow.getShooter() instanceof Player) {
-                Player shooter = (Player) arrow.getShooter();
-                UHCPlayer uhcShooter = NUHC.getInstance().getUhcPlayerManager().getPlayer(shooter.getUniqueId());
-                uhcShooter.getStats().addArrowHit();
-            }
+            uhcPlayer.getStats().incrementStat(StatType.ARROWS_SHOT, 1);
         }
     }
 
@@ -83,25 +70,24 @@ public class StatsListener implements Listener {
     public void onPlayerConsumeItem(PlayerItemConsumeEvent event) {
         Player player = event.getPlayer();
         UHCPlayer uhcPlayer = NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId());
+        ItemStack item = event.getItem();
 
-        if (event.getItem().getType() == Material.GOLDEN_APPLE) {
-            if (event.getItem().getItemMeta().hasDisplayName() &&
-                    "GoldenHead".equalsIgnoreCase(event.getItem().getItemMeta().getDisplayName())) {
-                uhcPlayer.getStats().addGoldenHeadConsumed();
+        if (item.getType() == Material.GOLDEN_APPLE) {
+            if (item.getItemMeta().hasDisplayName() && "GoldenHead".equalsIgnoreCase(item.getItemMeta().getDisplayName())) {
+                uhcPlayer.getStats().incrementStat(StatType.GOLDEN_HEADS_CONSUMED, 1);
             } else {
-                uhcPlayer.getStats().addGoldenAppleConsumed();
+                uhcPlayer.getStats().incrementStat(StatType.GOLDEN_APPLES_CONSUMED, 1);
             }
         }
     }
 
     @EventHandler
     public void onPlayerMount(PlayerInteractEntityEvent event) {
-        Player player = event.getPlayer();
-        Entity entity = event.getRightClicked();
-
-        if (entity instanceof Horse) {
+        if (event.getRightClicked() instanceof Horse) {
+            Player player = event.getPlayer();
             UHCPlayer uhcPlayer = NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId());
-            uhcPlayer.getStats().addHorseRiding();
+            uhcPlayer.getStats().incrementStat(StatType.HORSES_RIDDEN, 1);
+            uhcPlayer.getStats().recordAction("Mount", "Horse ridden", 1);
         }
     }
 }

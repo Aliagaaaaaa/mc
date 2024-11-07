@@ -20,22 +20,23 @@ public class ScenariosMenu implements Listener {
 
     public void openMenu(Player player) {
         List<Scenario> activeScenarios = NUHC.getInstance().getGameConfig().getScenarios();
-        int size = Math.max((int) Math.ceil(activeScenarios.size() / 9.0) * 9, 9); // Ensure size is at least 9
+        int size = Math.max((int) Math.ceil(activeScenarios.size() / 9.0) * 9, 9); // Al menos 9 slots
         Inventory menu = Bukkit.createInventory(null, size, ChatColor.GREEN + "Active Scenarios");
 
+        // Añadir los escenarios activos al menú
         for (Scenario scenario : activeScenarios) {
-            ItemStack item = createScenarioItem(scenario);
-            menu.addItem(item);
+            menu.addItem(createScenarioItem(scenario));
         }
 
+        // Añadir opción de editar si el jugador tiene permiso
         if (player.hasPermission("nuhc.admin.editscenarios")) {
-            ItemStack editItem = createEditItem();
-            menu.setItem(menu.getSize() - 1, editItem);  // Place at the last slot
+            menu.setItem(menu.getSize() - 1, createEditItem());
         }
 
         player.openInventory(menu);
     }
 
+    // Crea el ítem visual del escenario
     private ItemStack createScenarioItem(Scenario scenario) {
         ItemStack item = new ItemStack(scenario.getIcon());
         ItemMeta meta = item.getItemMeta();
@@ -47,6 +48,7 @@ public class ScenariosMenu implements Listener {
         return item;
     }
 
+    // Crea el ítem de edición de escenarios
     private ItemStack createEditItem() {
         ItemStack editItem = new ItemStack(Material.ANVIL);
         ItemMeta editMeta = editItem.getItemMeta();
@@ -60,7 +62,7 @@ public class ScenariosMenu implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!event.getView().getTitle().equals(ChatColor.GREEN + "Active Scenarios")) {
+        if (!ChatColor.stripColor(event.getView().getTitle()).equals("Active Scenarios")) {
             return;
         }
         event.setCancelled(true);
@@ -68,7 +70,7 @@ public class ScenariosMenu implements Listener {
         Player player = (Player) event.getWhoClicked();
         ItemStack clickedItem = event.getCurrentItem();
 
-        if (clickedItem == null || !clickedItem.hasItemMeta() || clickedItem.getItemMeta() == null) {
+        if (clickedItem == null || !clickedItem.hasItemMeta()) {
             return;
         }
 
@@ -76,12 +78,12 @@ public class ScenariosMenu implements Listener {
 
         if ("Edit Scenarios".equalsIgnoreCase(itemName) && player.hasPermission("nuhc.admin.editscenarios")) {
             new AddScenarioMenu().openMenu(player);
-            return;
+        } else {
+            handleScenarioClick(player, itemName);
         }
-
-        handleScenarioClick(player, itemName);
     }
 
+    // Maneja la interacción con un escenario específico
     private void handleScenarioClick(Player player, String scenarioName) {
         Scenario scenario = NUHC.getInstance().getScenarioManager().getScenario(scenarioName);
 

@@ -6,6 +6,7 @@ import lol.aliaga.nuhc.player.UHCPlayerState;
 import lol.aliaga.nuhc.scenarios.Scenario;
 import net.minecraft.server.v1_8_R3.NBTTagCompound;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -21,169 +22,145 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 
 public class StartCommand implements CommandExecutor {
 
     private final Random random = new Random();
-    private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    public static long seconds = 0;
+    public static BukkitRunnable timeTask;
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player) && !(sender instanceof org.bukkit.command.ConsoleCommandSender)) {
-            sender.sendMessage("Este comando solo puede ser ejecutado por un jugador o la consola.");
+            sender.sendMessage(ChatColor.RED + "Este comando solo puede ser ejecutado por un jugador o la consola.");
             return true;
         }
 
         int radio = NUHC.getInstance().getGameConfig().getBorder();
         World world = Bukkit.getWorld("world");
         if (world == null) {
-            sender.sendMessage("No se pudo encontrar el mundo 'world'.");
+            sender.sendMessage(ChatColor.RED + "No se pudo encontrar el mundo 'world'.");
             return true;
         }
 
-        Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "wb world set " + NUHC.getInstance().getGameConfig().getBorder() + " " + NUHC.getInstance().getGameConfig().getBorder() + " 0 0");
-
+        setInitialBorder(world);
         List<Player> jugadores = new ArrayList<>(Bukkit.getOnlinePlayers());
-        List<Location> ubicaciones = new ArrayList<>();
-        for (int i = 0; i < jugadores.size(); i++) {
-            Location loc = generarCoordenadaAleatoriaValida(world, radio);
-            ubicaciones.add(loc);
-        }
+        List<Location> ubicaciones = generatePlayerLocations(world, jugadores.size(), radio);
 
+        teleportPlayersWithCountdown(jugadores, ubicaciones);
+        sender.sendMessage(ChatColor.GREEN + "¡Los jugadores están siendo teletransportados!");
+        return true;
+    }
+
+    private void setInitialBorder(World world) {
+        int borderSize = NUHC.getInstance().getGameConfig().getBorder();
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "wb world set " + borderSize + " " + borderSize + " 0 0");
+    }
+
+    private List<Location> generatePlayerLocations(World world, int playerCount, int radius) {
+        List<Location> locations = new ArrayList<>();
+        for (int i = 0; i < playerCount; i++) {
+            locations.add(generateValidRandomLocation(world, radius));
+        }
+        return locations;
+    }
+
+    private Location generateValidRandomLocation(World world, int radius) {
+        Location loc;
+        int attempts = 0;
+        do {
+            loc = new Location(world, random.nextInt(2 * radius + 1) - radius, 0, random.nextInt(2 * radius + 1) - radius);
+            loc.setY(world.getHighestBlockYAt(loc));
+            attempts++;
+            if (attempts > 100) {
+                return world.getSpawnLocation();
+            }
+        } while (!isLocationValid(loc));
+        return loc;
+    }
+
+    private boolean isLocationValid(Location loc) {
+        Material ground = loc.getBlock().getType();
+        Material belowGround = loc.clone().subtract(0, 1, 0).getBlock().getType();
+
+        boolean isSolidGround = belowGround.isSolid();
+        boolean isNotLiquid = !ground.equals(Material.WATER) && !ground.equals(Material.LAVA) && !belowGround.equals(Material.WATER) && !belowGround.equals(Material.LAVA);
+
+        return isSolidGround && isNotLiquid;
+    }
+
+    private void teleportPlayersWithCountdown(List<Player> players, List<Location> locations) {
         new BukkitRunnable() {
             int index = 0;
 
             @Override
             public void run() {
-                if (index >= jugadores.size()) {
-                    iniciarCuentaRegresiva(jugadores);
+                if (index >= players.size()) {
+                    startCountdown(players);
                     cancel();
                     return;
                 }
 
-                Player jugador1 = jugadores.get(index);
-                Player jugador2 = (index + 1 < jugadores.size()) ? jugadores.get(index + 1) : null;
-
-                if (jugador1 != null) {
-                    Location loc1 = ubicaciones.get(index);
-                    jugador1.teleport(loc1);
-                    jugador1.sendMessage("¡Has sido teletransportado!");
-
-                    new BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            Horse caballo1 = crearCaballoInvisible(world, loc1);
-                            caballo1.setPassenger(jugador1);
-                            jugador1.sendMessage("¡Ahora estás montado en un caballo invisible!");
-                        }
-                    }.runTaskLater(NUHC.getInstance(), 20L);
+                teleportPlayerWithHorse(players.get(index), locations.get(index));
+                if (index + 1 < players.size()) {
+                    teleportPlayerWithHorse(players.get(index + 1), locations.get(index + 1));
                 }
-
-                if (jugador2 != null) {
-                    Location loc2 = ubicaciones.get(index + 1);
-                    jugador2.teleport(loc2);
-                    jugador2.sendMessage("¡Has sido teletransportado!");
-
-                    new BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            Horse caballo2 = crearCaballoInvisible(world, loc2);
-                            caballo2.setPassenger(jugador2);
-                            jugador2.sendMessage("¡Ahora estás montado en un caballo invisible!");
-                        }
-                    }.runTaskLater(NUHC.getInstance(), 20L);
-                }
-
                 index += 2;
             }
         }.runTaskTimer(NUHC.getInstance(), 0, 20);
-
-        sender.sendMessage("¡Los jugadores están siendo teletransportados!");
-        return true;
     }
 
-    private void iniciarCuentaRegresiva(List<Player> jugadores) {
-        NUHC.getInstance().setGameState(GameState.STARTING);
-        new BukkitRunnable() {
-            int countdown = 15;
+    private void teleportPlayerWithHorse(Player player, Location location) {
+        player.teleport(location);
+        player.sendMessage(ChatColor.GREEN + "¡Has sido teletransportado!");
 
+        new BukkitRunnable() {
             @Override
             public void run() {
-                if (countdown > 0) {
-                    Bukkit.broadcastMessage("La partida comienza en " + countdown + " segundo" + (countdown == 1 ? "" : "s") + "...");
-                    countdown--;
-                } else {
-                    Bukkit.broadcastMessage("¡La partida ha comenzado!");
-
-                    // Desmontar a todos los jugadores del caballo y eliminar el caballo
-                    for (Player jugador : jugadores) {
-                        if (jugador.isInsideVehicle() && jugador.getVehicle() instanceof Horse) {
-                            Horse caballo = (Horse) jugador.getVehicle();
-                            jugador.leaveVehicle(); // Bajar al jugador del caballo
-                            caballo.remove(); // Eliminar el caballo
-                        }
-                    }
-
-                    // Dar a los jugadores la cantidad específica de chuletas de vaca cocinadas
-                    ItemStack chuletas = new ItemStack(Material.COOKED_BEEF, 10); // Cambia '10' por la cantidad deseada
-                    for (Player jugador : jugadores) {
-                        jugador.getInventory().addItem(chuletas);
-                    }
-
-                    iniciarPartida(); // Iniciar la partida
-                    cancel();
-                }
+                Horse horse = spawnInvisibleHorse(location.getWorld(), location);
+                horse.setPassenger(player);
+                player.sendMessage(ChatColor.GREEN + "¡Ahora estás montado en un caballo invisible!");
             }
-        }.runTaskTimer(NUHC.getInstance(), 0, 20); // Cuenta regresiva cada segundo (20 ticks)
+        }.runTaskLater(NUHC.getInstance(), 20L);
     }
 
+    private Horse spawnInvisibleHorse(World world, Location location) {
+        Horse horse = (Horse) world.spawnEntity(location.add(0.5, 1, 0.5), EntityType.HORSE);
+        horse.setAdult();
+        horse.setTamed(true);
+        horse.setMaxHealth(20);
+        horse.setHealth(20);
+        setHorseAttributes(horse);
+        return horse;
+    }
 
+    private void setHorseAttributes(Horse horse) {
+        try {
+            net.minecraft.server.v1_8_R3.Entity nmsHorse = ((org.bukkit.craftbukkit.v1_8_R3.entity.CraftHorse) horse).getHandle();
+            Field invulnerableField = net.minecraft.server.v1_8_R3.Entity.class.getDeclaredField("invulnerable");
+            invulnerableField.setAccessible(true);
+            invulnerableField.setBoolean(nmsHorse, true);
 
-    private void iniciarPartida() {
-        startTimeTask();
-        Bukkit.broadcastMessage("¡La partida ha iniciado correctamente!");
-        NUHC.getInstance().setGameState(GameState.IN_GAME);
-        NUHC.getInstance().setStartTime(System.currentTimeMillis());
-        NUHC.getInstance().setCurrentBorder(NUHC.getInstance().getGameConfig().getBorder());
+            NBTTagCompound tag = nmsHorse.getNBTTag() != null ? nmsHorse.getNBTTag() : new NBTTagCompound();
+            nmsHorse.c(tag);
+            tag.setInt("NoAI", 1);
+            tag.setInt("Silent", 1);
+            nmsHorse.f(tag);
 
-        //registrar listeners de los scenarios
-        for(Scenario scenario : NUHC.getInstance().getGameConfig().getScenarios()){
-            NUHC.getInstance().getServer().getPluginManager().registerEvents(scenario, NUHC.getInstance());
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    nmsHorse.setInvisible(true);
+                }
+            }.runTaskLater(NUHC.getInstance(), 1L);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        updateBorder(2000);
-
     }
-
-    private void countdown(int seconds, String messagePrefix, Runnable action) {
-        new BukkitRunnable() {
-            int countdown = seconds;
-            @Override
-            public void run() {
-                if (countdown == 15 || countdown == 10 || countdown == 5 || countdown <= 4) {
-                    Bukkit.broadcastMessage(messagePrefix + countdown + " segundo" + (countdown == 1 ? "" : "s") + "...");
-                }
-                if (countdown == 0) {
-                    action.run();
-                    this.cancel();
-                }
-                countdown--;
-            }
-        }.runTaskTimer(NUHC.getInstance(), 0L, 20L);
-    }
-
-    public static long seconds = 0;
-    public static BukkitRunnable timeTask;
-
 
     private void updateBorder(int radius) {
-        System.out.println(radius+"aaa");
         new BukkitRunnable() {
-
             @Override
             public void run() {
                 Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "wb world set " + radius + " " + radius + " 0 0");
@@ -191,166 +168,49 @@ public class StartCommand implements CommandExecutor {
                 final int highestBlock = 4;
 
                 int posX = radius;
-                int negX = 0 - radius;
-
+                int negX = -radius;
                 int posZ = radius;
-                int negZ = 0 - radius;
+                int negZ = -radius;
 
-                final Queue<Location> locations1 = new ArrayDeque<>();
-                final Queue<Location> locations2 = new ArrayDeque<>();
+                final Queue<Location> locations = new ArrayDeque<>();
 
-                final Queue<Location> locations3 = new ArrayDeque<>();
-                final Queue<Location> locations4 = new ArrayDeque<>();
+                // Generar los bloques de bedrock en los bordes del cuadrado
+                for (int t = posX; t >= negX; t--) {
+                    int maxHeight1 = Bukkit.getWorld("world").getHighestBlockYAt(t, posZ) + highestBlock;
+                    int maxHeight2 = Bukkit.getWorld("world").getHighestBlockYAt(t, negZ) + highestBlock;
 
-                final Queue<Location> locations5 = new ArrayDeque<>();
-                final Queue<Location> locations6 = new ArrayDeque<>();
-
-                final Queue<Location> locations7 = new ArrayDeque<>();
-                final Queue<Location> locations8 = new ArrayDeque<>();
-
-
-
-                for(int t = posX; t >= 0; t--)
-                {
-                    int min = Bukkit.getWorld("world").getHighestBlockYAt(t, posZ);
-                    int max = min + highestBlock;
-                    if(max < 256)
-                    {
-                        for (int y = min; y < max; y++)
-                        {
-                            locations1.add(new Location( Bukkit.getWorld("world"), t, y, posZ));
-                        }
+                    for (int y = Bukkit.getWorld("world").getHighestBlockYAt(t, posZ); y < maxHeight1; y++) {
+                        locations.add(new Location(Bukkit.getWorld("world"), t, y, posZ));
                     }
-                }
-                for(int t = negX; t <= 0; t++)
-                {
-                    int min =  Bukkit.getWorld("world").getHighestBlockYAt(t, posZ);
-                    int max = min + highestBlock;
-                    if(max < 256)
-                    {
-                        for (int y = min; y < max; y++)
-                        {
-                            locations2.add(new Location( Bukkit.getWorld("world"), t, y, posZ));
-                        }
+
+                    for (int y = Bukkit.getWorld("world").getHighestBlockYAt(t, negZ); y < maxHeight2; y++) {
+                        locations.add(new Location(Bukkit.getWorld("world"), t, y, negZ));
                     }
                 }
 
-                for(int t = posX; t >= 0; t--)
-                {
-                    int min = Bukkit.getWorld("world").getHighestBlockYAt(t, negZ);
-                    int max = min + highestBlock;
-                    if(max < 256)
-                    {
-                        for (int y = min; y < max; y++)
-                        {
-                            locations3.add(new Location(Bukkit.getWorld("world"), t, y, negZ));
-                        }
+                for (int t = posZ; t >= negZ; t--) {
+                    int maxHeight1 = Bukkit.getWorld("world").getHighestBlockYAt(posX, t) + highestBlock;
+                    int maxHeight2 = Bukkit.getWorld("world").getHighestBlockYAt(negX, t) + highestBlock;
+
+                    for (int y = Bukkit.getWorld("world").getHighestBlockYAt(posX, t); y < maxHeight1; y++) {
+                        locations.add(new Location(Bukkit.getWorld("world"), posX, y, t));
                     }
-                }
-                for(int t = negX; t <= -0; t++)
-                {
-                    int min = Bukkit.getWorld("world").getHighestBlockYAt(t, negZ);
-                    int max = min + highestBlock;
-                    if(max < 256)
-                    {
-                        for (int y = min; y < max; y++)
-                        {
-                            locations4.add(new Location(Bukkit.getWorld("world"), t, y, negZ));
-                        }
-                    }
-                }
-                for(int t = posZ; t >= 0; t--)
-                {
-                    int min = Bukkit.getWorld("world").getHighestBlockYAt(posX, t);
-                    int max = min + highestBlock;
-                    if(max < 256)
-                    {
-                        for (int y = min; y < max; y++)
-                        {
-                            locations5.add(new Location(Bukkit.getWorld("world"), posX, y, t));
-                        }
-                    }
-                }
-                for(int t = negZ; t <= -0; t++)
-                {
-                    int min = Bukkit.getWorld("world").getHighestBlockYAt(posX, t);
-                    int max = min + highestBlock;
-                    if(max < 256)
-                    {
-                        for (int y = min; y < max; y++)
-                        {
-                            locations6.add(new Location(Bukkit.getWorld("world"), posX, y, t));
-                        }
+
+                    for (int y = Bukkit.getWorld("world").getHighestBlockYAt(negX, t); y < maxHeight2; y++) {
+                        locations.add(new Location(Bukkit.getWorld("world"), negX, y, t));
                     }
                 }
 
-                for(int t = posZ; t >= 0; t--)
-                {
-                    int min = Bukkit.getWorld("world").getHighestBlockYAt(negX, t);
-                    int max = min + highestBlock;
-                    if(max < 256)
-                    {
-                        for (int y = min; y < max; y++)
-                        {
-                            locations7.add(new Location(Bukkit.getWorld("world"), negX, y, t));
-                        }
-                    }
-                }
-                for(int t = negZ; t <= -0; t++)
-                {
-                    int min = Bukkit.getWorld("world").getHighestBlockYAt(negX, t);
-                    int max = min + highestBlock;
-                    if(max < 256)
-                    {
-                        for (int y = min; y < max; y++)
-                        {
-                            locations8.add(new Location(Bukkit.getWorld("world"), negX, y, t));
-                        }
-                    }
-                }
-                new BukkitRunnable()
-                {
-
+                new BukkitRunnable() {
                     @Override
-                    public void run()
-                    {
-                        for(int x = 0; x<blocksPerTick; x++)
-                        {
-                            if (!locations1.isEmpty())
-                            {
-                                locations1.poll().getBlock().setType(Material.BEDROCK);
-                            }
-                            if (!locations2.isEmpty())
-                            {
-                                locations2.poll().getBlock().setType(Material.BEDROCK);
-                            }
-                            if (!locations3.isEmpty())
-                            {
-                                locations3.poll().getBlock().setType(Material.BEDROCK);
-                            }
-                            if (!locations4.isEmpty())
-                            {
-                                locations4.poll().getBlock().setType(Material.BEDROCK);
-                            }
-                            if (!locations5.isEmpty())
-                            {
-                                locations5.poll().getBlock().setType(Material.BEDROCK);
-                            }
-                            if (!locations6.isEmpty())
-                            {
-                                locations6.poll().getBlock().setType(Material.BEDROCK);
-                            }
-                            if (!locations7.isEmpty())
-                            {
-                                locations7.poll().getBlock().setType(Material.BEDROCK);
-                            }
-                            if (!locations8.isEmpty())
-                            {
-                                locations8.poll().getBlock().setType(Material.BEDROCK);
-                            }
-                            else
-                            {
-                                this.cancel();
+                    public void run() {
+                        for (int i = 0; i < blocksPerTick; i++) {
+                            if (!locations.isEmpty()) {
+                                Location loc = locations.poll();
+                                loc.getBlock().setType(Material.BEDROCK);
+                            } else {
+                                cancel();
+                                break;
                             }
                         }
                     }
@@ -359,22 +219,74 @@ public class StartCommand implements CommandExecutor {
         }.runTask(NUHC.getInstance());
     }
 
+
+    private void startCountdown(List<Player> players) {
+        NUHC.getInstance().setGameState(GameState.STARTING);
+        new BukkitRunnable() {
+            int countdown = 15;
+
+            @Override
+            public void run() {
+                if (countdown > 0) {
+                    Bukkit.broadcastMessage(ChatColor.YELLOW + "La partida comienza en " + countdown + " segundo" + (countdown == 1 ? "" : "s") + "...");
+                    countdown--;
+                } else {
+                    Bukkit.broadcastMessage(ChatColor.GREEN + "¡La partida ha comenzado!");
+                    dismountPlayers(players);
+                    giveStartItems(players);
+                    startGame();
+                    cancel();
+                }
+            }
+        }.runTaskTimer(NUHC.getInstance(), 0, 20);
+    }
+
+    private void dismountPlayers(List<Player> players) {
+        for (Player player : players) {
+            if (player.isInsideVehicle() && player.getVehicle() instanceof Horse) {
+                Horse horse = (Horse) player.getVehicle();
+                player.leaveVehicle();
+                horse.remove();
+            }
+        }
+    }
+
+    private void giveStartItems(List<Player> players) {
+        ItemStack steak = new ItemStack(Material.COOKED_BEEF, 10);
+        for (Player player : players) {
+            player.getInventory().addItem(steak);
+        }
+    }
+
+    private void startGame() {
+        NUHC.getInstance().setGameState(GameState.IN_GAME);
+        NUHC.getInstance().setStartTime(System.currentTimeMillis());
+        NUHC.getInstance().setCurrentBorder(NUHC.getInstance().getGameConfig().getBorder());
+
+        Bukkit.broadcastMessage(ChatColor.GREEN + "¡La partida ha iniciado correctamente!");
+
+        for (Scenario scenario : NUHC.getInstance().getGameConfig().getScenarios()) {
+            NUHC.getInstance().getServer().getPluginManager().registerEvents(scenario, NUHC.getInstance());
+        }
+
+        startTimeTask();
+    }
+
     public void startTimeTask() {
         if (timeTask != null) {
             timeTask.cancel();
         }
 
-        final int[] bordes = {3000, 2000, 1500, 1000, 500, 250, 100, 50};
+        final int[] borders = {3000, 2000, 1500, 1000, 500, 250, 100, 50};
         int initialBorder = NUHC.getInstance().getGameConfig().getBorder();
 
-        // Encontrar el índice del borde inicial en el array 'bordes'
-        final int[] currentBorderIndex = {IntStream.range(0, bordes.length)
-                .filter(i -> bordes[i] == initialBorder)
+        final int[] currentBorderIndex = {IntStream.range(0, borders.length)
+                .filter(i -> borders[i] == initialBorder)
                 .findFirst()
-                .orElse(0) + 1} ; // Si no se encuentra, empezar en el índice 0
+                .orElse(0) + 1};
 
-        int borderShrinkingTime = NUHC.getInstance().getGameConfig().getBorderShrinking() * 60; // Tiempo inicial en segundos
-        final int[] nextBorderTime = {borderShrinkingTime}; // Tiempo para la primera reducción
+        int borderShrinkingTime = NUHC.getInstance().getGameConfig().getBorderShrinking() * 60;
+        final int[] nextBorderTime = {borderShrinkingTime};
 
         timeTask = new BukkitRunnable() {
             @Override
@@ -383,58 +295,27 @@ public class StartCommand implements CommandExecutor {
                     seconds++;
 
                     int pvpTime = NUHC.getInstance().getGameConfig().getPvpTime() * 60;
-                    if (seconds == pvpTime - 15 || seconds == pvpTime - 10 || seconds == pvpTime - 5 || (seconds <= pvpTime - 1 && seconds > pvpTime - 15)) {
-                        Bukkit.broadcastMessage("El PvP se activará en " + (pvpTime - seconds) + " segundo" + ((pvpTime - seconds) == 1 ? "" : "s") + "...");
+                    if (isCountdownTime(pvpTime)) {
+                        Bukkit.broadcastMessage(ChatColor.YELLOW + "PvP comienza en " + formatCountdown((int) (pvpTime - seconds)) + ".");
                     }
-
-                    if (seconds == pvpTime) {
-                        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () -> {
-                            Bukkit.broadcastMessage("¡El PvP se ha activado!");
-                            // Activar el PvP en el mundo "world"
-                            World world = Bukkit.getWorld("world");
-                            if (world != null) {
-                                world.setPVP(true);
-                            }
-                        }, 20L);
-                    }
+                    if (seconds == pvpTime) enablePvP();
 
                     int finalHealTime = NUHC.getInstance().getGameConfig().getFinalHealTime() * 60;
-                    if (seconds == finalHealTime - 15 || seconds == finalHealTime - 10 || seconds == finalHealTime - 5 || (seconds <= finalHealTime - 1 && seconds > finalHealTime - 15)) {
-                        Bukkit.broadcastMessage("El Final Heal comenzará en " + (finalHealTime - seconds) + " segundo" + ((finalHealTime - seconds) == 1 ? "" : "s") + "...");
+                    if (isCountdownTime(finalHealTime)) {
+                        Bukkit.broadcastMessage(ChatColor.YELLOW + "El Final Heal comienza en " + formatCountdown((int) (finalHealTime - seconds)) + ".");
                     }
+                    if (seconds == finalHealTime) startFinalHeal();
 
-                    if (seconds == finalHealTime) {
-                        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () -> {
-                            Bukkit.broadcastMessage("¡El Final Heal ha comenzado!");
-                            // Curar a todos los jugadores
-                            for (Player player : Bukkit.getOnlinePlayers()) {
-                                if (NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId()).getState() == UHCPlayerState.PLAYER) {
-                                    player.setHealth(player.getMaxHealth());
-                                    player.setFoodLevel(20);
-                                    player.setFireTicks(0); // Apagar el fuego si está en llamas
-                                }
-                            }
-                        }, 20L);
+                    if (isCountdownTime(nextBorderTime[0])) {
+                        Bukkit.broadcastMessage(ChatColor.RED + "El borde se reducirá en " + formatCountdown((int) (nextBorderTime[0] - seconds)) + ".");
                     }
-
-                    if (seconds == nextBorderTime[0] - 15 || seconds == nextBorderTime[0] - 10 || seconds == nextBorderTime[0] - 5 || (seconds <= nextBorderTime[0] - 1 && seconds > nextBorderTime[0] - 15)) {
-                        Bukkit.broadcastMessage("El borde comenzará a reducirse en " + (nextBorderTime[0] - seconds) + " segundo" + ((nextBorderTime[0] - seconds) == 1 ? "" : "s") + "...");
+                    if (seconds >= nextBorderTime[0] && currentBorderIndex[0] < borders.length) {
+                        int newBorder = borders[currentBorderIndex[0]++];
+                        nextBorderTime[0] += 300;
+                        shrinkBorder(newBorder);
                     }
-
-                    if (seconds >= nextBorderTime[0] && currentBorderIndex[0] < bordes.length) {
-                        int nuevoBorde = bordes[currentBorderIndex[0]];
-                        Bukkit.getScheduler().runTask(NUHC.getInstance(), () -> {
-                            reducirBorde(nuevoBorde);
-                            Bukkit.broadcastMessage("El borde se ha reducido a " + nuevoBorde + " bloques.");
-                        });
-
-                        currentBorderIndex[0]++;
-                        // Calcular el tiempo para la siguiente reducción (1 minuto = 60 segundos)
-                        nextBorderTime[0] += 60 * 5;
-                    }
-
                 } else {
-                    this.cancel();
+                    cancel();
                     timeTask = null;
                     seconds = 0;
                 }
@@ -443,108 +324,47 @@ public class StartCommand implements CommandExecutor {
         timeTask.runTaskTimer(NUHC.getInstance(), 0L, 20L);
     }
 
-    private void reducirBorde(int nuevoRadio) {
-        World world = Bukkit.getWorld("world");
-        if (world == null) {
-            return;
-        }
-
-        Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "wb world set " + nuevoRadio + " " + nuevoRadio + " 0 0");
-        updateBorder(nuevoRadio);
-        NUHC.getInstance().setCurrentBorder(nuevoRadio);
-
+    private boolean isCountdownTime(int targetTime) {
+        return seconds == targetTime - 15 || seconds == targetTime - 10 || seconds == targetTime - 5 || (seconds <= targetTime - 1 && seconds > targetTime - 15);
     }
 
+    private String formatCountdown(int countdown) {
+        return countdown + " segundo" + (countdown == 1 ? "" : "s");
+    }
 
-    private Location generarCoordenadaAleatoriaValida(World world, int radio) {
-        Location loc;
-        int intentos = 0;
-        int maxIntentos = 100; // Evita posibles bucles infinitos
-
-        do {
-            loc = generarCoordenadaAleatoria(world, radio);
-            intentos++;
-            if (intentos > maxIntentos) {
-                loc = world.getSpawnLocation();
-                break;
+    private void enablePvP() {
+        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () -> {
+            Bukkit.broadcastMessage(ChatColor.GREEN + "¡PvP está activado!");
+            World world = Bukkit.getWorld("world");
+            if (world != null) {
+                world.setPVP(true);
             }
-        } while (!esUbicacionValida(world, loc));
-
-        return loc;
+        }, 20L);
     }
 
-    private Location generarCoordenadaAleatoria(World world, int radio) {
-        int x = random.nextInt(2 * radio + 1) - radio;
-        int z = random.nextInt(2 * radio + 1) - radio;
-        int y = world.getHighestBlockYAt(x, z); // Asegurarse de teletransportar sobre el suelo
-        return new Location(world, x, y, z);
-    }
-
-    private boolean esUbicacionValida(World world, Location loc) {
-        Material material = loc.getBlock().getType();
-        Material bloqueDebajo = loc.clone().subtract(0, 1, 0).getBlock().getType();
-
-        boolean noEnAgua = !material.equals(Material.WATER) && !material.equals(Material.STATIONARY_WATER);
-        boolean noSobreAgua = !bloqueDebajo.equals(Material.WATER) && !bloqueDebajo.equals(Material.STATIONARY_WATER);
-        boolean noEnLava = !material.equals(Material.LAVA) && !material.equals(Material.STATIONARY_LAVA);
-        boolean noSobreLava = !bloqueDebajo.equals(Material.LAVA) && !bloqueDebajo.equals(Material.STATIONARY_LAVA);
-        boolean noSobreArbol = !(bloqueDebajo.equals(Material.LEAVES) || bloqueDebajo.equals(Material.LEAVES_2));
-
-        boolean sinAguaAlrededor = true;
-        for (int x = -1; x <= 1; x++) {
-            for (int z = -1; z <= 1; z++) {
-                Location bloqueAlrededor = loc.clone().add(x, 0, z);
-                Material materialAlrededor = bloqueAlrededor.getBlock().getType();
-                if (materialAlrededor.equals(Material.WATER) || materialAlrededor.equals(Material.STATIONARY_WATER)) {
-                    sinAguaAlrededor = false;
-                    break;
+    private void startFinalHeal() {
+        Bukkit.getScheduler().runTaskLater(NUHC.getInstance(), () -> {
+            Bukkit.broadcastMessage(ChatColor.GREEN + "¡Final Heal ha comenzado!");
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (NUHC.getInstance().getUhcPlayerManager().getPlayer(player.getUniqueId()).getState() == UHCPlayerState.PLAYER) {
+                    player.setHealth(player.getMaxHealth());
+                    player.setFoodLevel(20);
+                    player.setFireTicks(0);
                 }
             }
-            if (!sinAguaAlrededor) {
-                break;
-            }
-        }
-
-        return noEnAgua && noSobreAgua && noEnLava && noSobreLava && noSobreArbol && sinAguaAlrededor;
+        }, 20L);
     }
 
-
-    private Horse crearCaballoInvisible(World world, Location location) {
-        Horse horse = (Horse) world.spawnEntity(location.add(0.5, 1, 0.5), EntityType.HORSE);
-        horse.setMaxHealth(20);
-        horse.setHealth(20);
-        horse.setAdult();
-        horse.setTamed(true);
-
-        try {
-            net.minecraft.server.v1_8_R3.Entity horseEntity = ((org.bukkit.craftbukkit.v1_8_R3.entity.CraftHorse) horse).getHandle();
-
-            Field invulnerableField = net.minecraft.server.v1_8_R3.Entity.class.getDeclaredField("invulnerable");
-            invulnerableField.setAccessible(true);
-            invulnerableField.setBoolean(horseEntity, true);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-
-        final net.minecraft.server.v1_8_R3.Entity nmsEntity = ((CraftEntity) horse).getHandle();
-        NBTTagCompound tag = nmsEntity.getNBTTag();
-        if (tag == null) {
-            tag = new NBTTagCompound();
-        }
-        nmsEntity.c(tag);
-        tag.setInt("NoAI", 1); // Desactiva la IA del caballo
-        tag.setInt("Silent", 1); // Hace al caballo silencioso
-        nmsEntity.f(tag);
-
-        // Asegurar que el caballo sea invisible
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                ((CraftEntity) horse).getHandle().setInvisible(true);
-            }
-        }.runTaskLater(NUHC.getInstance(), 1L); // Retraso de 1 tick
-
-        return horse;
+    private void shrinkBorder(int newBorder) {
+        Bukkit.getScheduler().runTask(NUHC.getInstance(), () -> {
+            Bukkit.broadcastMessage(ChatColor.RED + "El borde se ha reducido a " + newBorder + " bloques.");
+            updateBorder(newBorder);
+            setBorder(newBorder);
+        });
     }
 
+    private void setBorder(int newBorder) {
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "wb world set " + newBorder + " " + newBorder + " 0 0");
+        NUHC.getInstance().setCurrentBorder(newBorder);
+    }
 }

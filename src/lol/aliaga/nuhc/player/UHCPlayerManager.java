@@ -1,13 +1,14 @@
 package lol.aliaga.nuhc.player;
 
-import lol.aliaga.nuhc.NUHC;
 import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public class UHCPlayerManager {
-
     private final Map<UUID, UHCPlayer> players;
 
     public UHCPlayerManager() {
@@ -19,6 +20,9 @@ public class UHCPlayerManager {
     }
 
     public void createPlayer(UUID uniqueId) {
+        if(players.containsKey(uniqueId)) {
+            return;
+        }
         players.put(uniqueId, new UHCPlayer(uniqueId));
     }
 
@@ -38,3 +42,4 @@ public class UHCPlayerManager {
         return new ArrayList<>(players.values());
     }
 }
+

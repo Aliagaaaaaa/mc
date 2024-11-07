@@ -2,6 +2,7 @@ package lol.aliaga.nuhc.menus;
 
 import lol.aliaga.nuhc.NUHC;
 import lol.aliaga.nuhc.game.GameConfig;
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -10,6 +11,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.InventoryView;
 
 public class MenuEventHandler implements Listener {
 
@@ -33,9 +35,9 @@ public class MenuEventHandler implements Listener {
         }
     }
 
+    // Manejar clic en el menú de configuración principal
     private void handleConfigMenuClick(Player player, ItemStack clickedItem) {
         String itemName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
-
         if (player.hasPermission("uhc.edit")) {
             switch (itemName) {
                 case "Final Heal Time":
@@ -78,11 +80,12 @@ public class MenuEventHandler implements Listener {
                     openEditMenu(player, "practice");
                     break;
                 default:
-                    break;
+                    player.sendMessage(ChatColor.RED + "Unknown option: " + itemName);
             }
         }
     }
 
+    // Manejar clic en el menú de edición
     private void handleEditMenuClick(Player player, String menuTitle, ItemStack clickedItem) {
         String itemName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
         GameConfig config = NUHC.getInstance().getGameConfig();
@@ -104,22 +107,22 @@ public class MenuEventHandler implements Listener {
                 toggleBoolean(configName, config);
                 break;
             default:
-                break;
+                player.sendMessage(ChatColor.RED + "Unknown action: " + itemName);
         }
-
         new EditConfigMenu(configName).openMenu(player);
     }
 
+    // Lógica para disminuir valores en el menú de edición
     private void handleDecrease(String configName, GameConfig config) {
         switch (configName) {
             case "finalheal":
-                config.setFinalHealTime(config.getFinalHealTime() - 1);
+                config.setFinalHealTime(Math.max(0, config.getFinalHealTime() - 1));
                 break;
             case "border":
                 config.setBorder(getBorderValue(getCurrentBorderIndex(config.getBorder()) + 1));
                 break;
             case "bordershrinking":
-                config.setBorderShrinking(config.getBorderShrinking() - 5);
+                config.setBorderShrinking(Math.max(5, config.getBorderShrinking() - 5));
                 break;
             case "teams":
                 config.setTeams(Math.max(1, config.getTeams() - 1));
@@ -143,6 +146,7 @@ public class MenuEventHandler implements Listener {
         }
     }
 
+    // Lógica para aumentar valores en el menú de edición
     private void handleIncrease(String configName, GameConfig config) {
         switch (configName) {
             case "finalheal":
@@ -176,6 +180,7 @@ public class MenuEventHandler implements Listener {
         }
     }
 
+    // Alternar valores booleanos en el menú de edición
     private void toggleBoolean(String configName, GameConfig config) {
         switch (configName) {
             case "nether":
@@ -192,6 +197,7 @@ public class MenuEventHandler implements Listener {
         }
     }
 
+    // Disminuir valores de efectos específicos
     private void decreaseEffect(String effectType, GameConfig config) {
         switch (effectType) {
             case "speed":
@@ -208,6 +214,7 @@ public class MenuEventHandler implements Listener {
         }
     }
 
+    // Aumentar valores de efectos específicos
     private void increaseEffect(String effectType, GameConfig config) {
         switch (effectType) {
             case "speed":
@@ -224,18 +231,19 @@ public class MenuEventHandler implements Listener {
         }
     }
 
+    // Abrir menú de edición específico
     private void openEditMenu(Player player, String configName) {
         new EditConfigMenu(configName).openMenu(player);
     }
 
-    // Helper methods for handling border values
+    // Valores de bordes predeterminados y sus índices
     private final int[] borderValues = {3000, 2000, 1500, 1000, 500, 250, 100, 50};
 
     private int getCurrentBorderIndex(int currentBorder) {
         for (int i = 0; i < borderValues.length; i++) {
             if (borderValues[i] == currentBorder) return i;
         }
-        return 0;  // default to index 0
+        return 0;  // Predeterminado al índice 0
     }
 
     private int getBorderValue(int index) {

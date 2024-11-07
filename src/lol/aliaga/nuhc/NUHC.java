@@ -6,75 +6,84 @@ import lol.aliaga.nuhc.board.UHCBoard;
 import lol.aliaga.nuhc.commands.*;
 import lol.aliaga.nuhc.game.GameConfig;
 import lol.aliaga.nuhc.game.GameState;
-import lol.aliaga.nuhc.listeners.PlayerJoinListener;
+import lol.aliaga.nuhc.listeners.LobbyListener;
+import lol.aliaga.nuhc.listeners.PlayerDeathListener;
 import lol.aliaga.nuhc.menus.*;
 import lol.aliaga.nuhc.player.UHCPlayerManager;
 import lol.aliaga.nuhc.scenarios.ScenarioManager;
 import lol.aliaga.nuhc.team.UHCTeamManager;
-import lol.aliaga.nuhc.utils.EmptyChunkGenerator;
 import lombok.Getter;
 import lombok.Setter;
 import org.bukkit.Bukkit;
+import org.bukkit.Difficulty;
 import org.bukkit.World;
-import org.bukkit.WorldCreator;
-import org.bukkit.WorldType;
 import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
-
-import java.util.UUID;
 
 public class NUHC extends JavaPlugin {
-
     @Getter
     private static NUHC instance;
 
     @Getter
     private UHCPlayerManager uhcPlayerManager;
+
     @Getter
     private ScenarioManager scenarioManager;
+
     @Getter
     private UHCTeamManager uhcTeamManager;
+
     @Getter @Setter
     private GameState gameState;
+
     @Getter @Setter
     private GameConfig gameConfig;
+
     @Getter @Setter
     private int currentBorder;
+
     @Getter @Setter
     private long startTime;
 
     @Override
     public void onEnable() {
         instance = this;
+        gameState = GameState.SETUP;
         initializeManagers();
         registerListeners();
         registerCommands();
         setupScoreboard();
-    }
 
+        World world = Bukkit.getWorld("lobby");
+        world.setDifficulty(Difficulty.PEACEFUL);
+
+    }
 
     @Override
     public void onDisable() {
-        // Aquí puedes manejar las tareas de limpieza si es necesario
+
     }
 
     private void initializeManagers() {
-        gameState = GameState.SETUP;
         uhcPlayerManager = new UHCPlayerManager();
-        gameConfig = new GameConfig();
         scenarioManager = new ScenarioManager();
         uhcTeamManager = new UHCTeamManager();
+        gameConfig = new GameConfig();
     }
 
     private void registerListeners() {
-        getServer().getPluginManager().registerEvents(new PlayerJoinListener(), this);
-        getServer().getPluginManager().registerEvents(new MenuEventHandler(), this);
-        getServer().getPluginManager().registerEvents(new ScenariosMenu(), this);
-        getServer().getPluginManager().registerEvents(new AddScenarioMenu(), this);
-        getServer().getPluginManager().registerEvents(new WorldMenu(), this);
-        getServer().getPluginManager().registerEvents(new TopKillsMenu(), this);
+        PluginManager pm = getServer().getPluginManager();
+        pm.registerEvents(new LobbyListener(), this);
+        pm.registerEvents(new PlayerDeathListener(), this);
 
+
+        pm.registerEvents(new MenuEventHandler(), this);
+        pm.registerEvents(new ScenariosMenu(), this);
+        pm.registerEvents(new AddScenarioMenu(), this);
+        pm.registerEvents(new WorldMenu(), this);
+        pm.registerEvents(new TopKillsMenu(), this);
     }
 
     private void registerCommands() {
@@ -97,12 +106,13 @@ public class NUHC extends JavaPlugin {
         registerCommand("kt", new KillTopCommand());
         registerCommand("tele", new TeleCommand());
         registerCommand("rules", new RulesCommand());
-
-
     }
 
     private void registerCommand(String name, CommandExecutor executor) {
-        getCommand(name).setExecutor(executor);
+        PluginCommand command = getCommand(name);
+        if (command != null) {
+            command.setExecutor(executor);
+        }
     }
 
     private void setupScoreboard() {
@@ -110,5 +120,4 @@ public class NUHC extends JavaPlugin {
         assemble.setTicks(2);
         assemble.setAssembleStyle(AssembleStyle.KOHI);
     }
-
 }

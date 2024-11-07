@@ -16,12 +16,11 @@ public class TeamCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage("This command can only be executed by players.");
+            sender.sendMessage(ChatColor.RED + "This command can only be executed by players.");
             return true;
         }
 
         Player player = (Player) sender;
-
         if (NUHC.getInstance().getGameConfig().getTeams() == 1) {
             player.sendMessage(ChatColor.RED + "Teams are not enabled!");
             return true;
@@ -33,7 +32,6 @@ public class TeamCommand implements CommandExecutor {
         }
 
         String subCommand = args[0].toLowerCase();
-
         switch (subCommand) {
             case "create":
                 handleCreateTeam(player);
@@ -56,7 +54,6 @@ public class TeamCommand implements CommandExecutor {
             default:
                 player.sendMessage(ChatColor.RED + "Unknown command.");
         }
-
         return true;
     }
 
@@ -65,7 +62,6 @@ public class TeamCommand implements CommandExecutor {
             player.sendMessage(ChatColor.RED + "You are already in a team.");
             return;
         }
-
         if (NUHC.getInstance().getUhcTeamManager().createTeam(player)) {
             player.sendMessage(ChatColor.GREEN + "You have created a team.");
         }
@@ -76,20 +72,17 @@ public class TeamCommand implements CommandExecutor {
             player.sendMessage(ChatColor.RED + "You must specify a player to invite.");
             return;
         }
-
         String inviteeName = args[1];
         Player invitee = Bukkit.getPlayer(inviteeName);
         if (invitee == null) {
             player.sendMessage(ChatColor.RED + "The player is not online.");
             return;
         }
-
         UHCTeam playerTeam = NUHC.getInstance().getUhcTeamManager().getPlayerTeam(player);
         if (playerTeam == null) {
             player.sendMessage(ChatColor.RED + "You are not in a team.");
             return;
         }
-
         playerTeam.invitePlayer(invitee);
         player.sendMessage(ChatColor.GREEN + "You have invited " + inviteeName + " to your team.");
     }
@@ -99,24 +92,20 @@ public class TeamCommand implements CommandExecutor {
             player.sendMessage(ChatColor.RED + "You must specify a team member to join.");
             return;
         }
-
         String memberName = args[1];
         if (NUHC.getInstance().getUhcTeamManager().getPlayerTeam(player) != null) {
             player.sendMessage(ChatColor.RED + "You are already in a team.");
             return;
         }
-
         UHCTeam team = NUHC.getInstance().getUhcTeamManager().getTeamByMemberName(memberName);
         if (team == null) {
             player.sendMessage(ChatColor.RED + "No team found with a member named " + memberName + ".");
             return;
         }
-
         if (!team.hasInvitation(player)) {
             player.sendMessage(ChatColor.RED + "You do not have an invitation to join this team.");
             return;
         }
-
         team.acceptInvitation(player);
     }
 
@@ -125,29 +114,24 @@ public class TeamCommand implements CommandExecutor {
             player.sendMessage(ChatColor.RED + "You must specify a player to kick.");
             return;
         }
-
         String kickPlayerName = args[1];
         Player kickPlayer = Bukkit.getPlayer(kickPlayerName);
         if (kickPlayer == null) {
             player.sendMessage(ChatColor.RED + "The player is not online.");
             return;
         }
-
         UHCTeam playerTeam = NUHC.getInstance().getUhcTeamManager().getPlayerTeam(player);
         UHCTeam kickPlayerTeam = NUHC.getInstance().getUhcTeamManager().getPlayerTeam(kickPlayer);
-
         if (playerTeam == null || kickPlayerTeam == null || !playerTeam.getName().equals(kickPlayerTeam.getName())) {
             player.sendMessage(ChatColor.RED + "You cannot kick this player because they are not in your team.");
             return;
         }
-
         if (!playerTeam.isLeader(player)) {
             player.sendMessage(ChatColor.RED + "Only the team leader can kick players.");
             return;
         }
-
         playerTeam.removeMember(kickPlayer);
-        playerTeam.broadcast(kickPlayerName + " has been kicked from the team.");
+        playerTeam.broadcast(ChatColor.YELLOW + kickPlayerName + " has been kicked from the team.");
     }
 
     private void handleLeaveTeam(Player player) {
@@ -156,7 +140,6 @@ public class TeamCommand implements CommandExecutor {
             player.sendMessage(ChatColor.RED + "You are not in a team.");
             return;
         }
-
         playerTeam.removeMember(player);
         player.sendMessage(ChatColor.YELLOW + "You have left the team " + playerTeam.getName() + ".");
     }
@@ -167,12 +150,11 @@ public class TeamCommand implements CommandExecutor {
             player.sendMessage(ChatColor.RED + "You are not in a team.");
             return;
         }
-
         player.sendMessage(ChatColor.GREEN + "Team members of " + playerTeam.getName() + ":");
         for (UUID memberUUID : playerTeam.getMembers()) {
             Player member = Bukkit.getPlayer(memberUUID);
             if (member != null) {
-                player.sendMessage(ChatColor.YELLOW + "- " + member.getName());
+                player.sendMessage(ChatColor.YELLOW + " - " + member.getName());
             }
         }
     }

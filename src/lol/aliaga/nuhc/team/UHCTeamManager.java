@@ -22,7 +22,6 @@ public class UHCTeamManager {
             leader.sendMessage(ChatColor.RED + "A team with that name already exists.");
             return false;
         }
-
         UHCTeam newTeam = new UHCTeam(leader);
         teams.put(defaultName, newTeam);
         leader.sendMessage(ChatColor.GREEN + "You have created the team " + ChatColor.WHITE + defaultName + "!");
@@ -69,12 +68,10 @@ public class UHCTeamManager {
             player.sendMessage(ChatColor.RED + "There is no team with the name " + ChatColor.WHITE + teamName + ".");
             return false;
         }
-
         if (!team.hasInvitation(player)) {
             player.sendMessage(ChatColor.RED + "You do not have an invitation to join this team.");
             return false;
         }
-
         team.acceptInvitation(player);
         player.sendMessage(ChatColor.GREEN + "You have joined the team " + ChatColor.WHITE + teamName + "!");
         return true;

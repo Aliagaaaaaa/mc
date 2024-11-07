@@ -18,60 +18,28 @@ public class WorldMenu implements Listener {
     public static void openWorldMenu(Player player) {
         Inventory menu = Bukkit.createInventory(null, 9, ChatColor.GREEN + "World Management");
 
-        // Opción para cargar chunks
-        ItemStack loadChunks = new ItemStack(Material.GRASS);
-        ItemMeta loadChunksMeta = loadChunks.getItemMeta();
-        loadChunksMeta.setDisplayName(ChatColor.GREEN + "Load Chunks");
-        loadChunks.setItemMeta(loadChunksMeta);
-        menu.setItem(0, loadChunks);
+        menu.setItem(0, createMenuItem(Material.GRASS, ChatColor.GREEN + "Load Chunks"));
+        menu.setItem(1, createMenuItem(Material.TNT, ChatColor.RED + "Delete World"));
+        menu.setItem(2, createMenuItem(Material.DIAMOND, ChatColor.BLUE + "Create World"));
+        menu.setItem(3, createMenuItem(Material.ENDER_PEARL, ChatColor.YELLOW + "Teleport to World"));
 
-        // Opción para eliminar mundo
-        ItemStack deleteWorld = new ItemStack(Material.TNT);
-        ItemMeta deleteWorldMeta = deleteWorld.getItemMeta();
-        deleteWorldMeta.setDisplayName(ChatColor.RED + "Delete World");
-        deleteWorld.setItemMeta(deleteWorldMeta);
-        menu.setItem(1, deleteWorld);
-
-        // Opción para crear mundo
-        ItemStack createWorld = new ItemStack(Material.DIAMOND);
-        ItemMeta createWorldMeta = createWorld.getItemMeta();
-        createWorldMeta.setDisplayName(ChatColor.BLUE + "Create World");
-        createWorld.setItemMeta(createWorldMeta);
-        menu.setItem(2, createWorld);
-
-        // Opción para teletransportar al mundo
-        ItemStack teleportWorld = new ItemStack(Material.ENDER_PEARL);
-        ItemMeta teleportWorldMeta = teleportWorld.getItemMeta();
-        teleportWorldMeta.setDisplayName(ChatColor.YELLOW + "Teleport to World");
-        teleportWorld.setItemMeta(teleportWorldMeta);
-        menu.setItem(3, teleportWorld);
-
-        // Opción para crear y cargar chunks del mundo Nether si está habilitado en la configuración
         if (NUHC.getInstance().getGameConfig().isNether()) {
-            // Botón para crear mundo de Nether
-            ItemStack createNetherWorld = new ItemStack(Material.NETHER_STAR);
-            ItemMeta createNetherWorldMeta = createNetherWorld.getItemMeta();
-            createNetherWorldMeta.setDisplayName(ChatColor.DARK_RED + "Create Nether World");
-            createNetherWorld.setItemMeta(createNetherWorldMeta);
-            menu.setItem(4, createNetherWorld);
-
-            // Botón para cargar chunks del Nether
-            ItemStack loadNetherChunks = new ItemStack(Material.BLAZE_POWDER); // Cambiado a BLAZE_POWDER
-            ItemMeta loadNetherChunksMeta = loadNetherChunks.getItemMeta();
-            loadNetherChunksMeta.setDisplayName(ChatColor.DARK_RED + "Load Nether Chunks");
-            loadNetherChunks.setItemMeta(loadNetherChunksMeta);
-            menu.setItem(5, loadNetherChunks);
-
-            // Botón para teletransportar al Nether
-            ItemStack teleportNether = new ItemStack(Material.ENDER_PEARL);
-            ItemMeta teleportNetherMeta = teleportNether.getItemMeta();
-            teleportNetherMeta.setDisplayName(ChatColor.RED + "Teleport to Random Nether");
-            teleportNether.setItemMeta(teleportNetherMeta);
-            menu.setItem(6, teleportNether);
+            menu.setItem(4, createMenuItem(Material.NETHER_STAR, ChatColor.DARK_RED + "Create Nether World"));
+            menu.setItem(5, createMenuItem(Material.BLAZE_POWDER, ChatColor.DARK_RED + "Load Nether Chunks"));
+            menu.setItem(6, createMenuItem(Material.ENDER_PEARL, ChatColor.RED + "Teleport to Random Nether"));
         }
 
-        // Abrir el menú al jugador
         player.openInventory(menu);
+    }
+
+    private static ItemStack createMenuItem(Material material, String displayName) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(displayName);
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     @EventHandler
@@ -79,8 +47,8 @@ public class WorldMenu implements Listener {
         if (!ChatColor.stripColor(event.getView().getTitle()).equals("World Management")) {
             return;
         }
-
         event.setCancelled(true);
+
         Player player = (Player) event.getWhoClicked();
         ItemStack clickedItem = event.getCurrentItem();
 
@@ -89,7 +57,6 @@ public class WorldMenu implements Listener {
         }
 
         String itemName = ChatColor.stripColor(clickedItem.getItemMeta().getDisplayName());
-
         switch (itemName) {
             case "Load Chunks":
                 loadChunks(player);
@@ -115,7 +82,6 @@ public class WorldMenu implements Listener {
             default:
                 break;
         }
-
         player.closeInventory();
     }
 
@@ -132,8 +98,8 @@ public class WorldMenu implements Listener {
         worldCreator.environment(World.Environment.NORMAL);
         worldCreator.type(WorldType.NORMAL);
         worldCreator.generateStructures(true);
-
         World newWorld = Bukkit.createWorld(worldCreator);
+
         if (newWorld != null) {
             player.sendMessage(ChatColor.BLUE + "World 'world' created successfully.");
         } else {
@@ -166,7 +132,7 @@ public class WorldMenu implements Listener {
 
         World world = Bukkit.getWorld("world");
         if (world != null) {
-            Bukkit.unloadWorld(world, false);  // false para no guardar los datos del mundo
+            Bukkit.unloadWorld(world, false);  // Unload world without saving
         }
 
         File worldFolder = new File(Bukkit.getWorldContainer(), "world");
@@ -193,14 +159,13 @@ public class WorldMenu implements Listener {
         return path.delete();
     }
 
-    // Método para crear el mundo de Nether
     public static void createNetherWorld(Player player) {
         WorldCreator netherCreator = new WorldCreator("world_nether");
         netherCreator.environment(World.Environment.NETHER);
-        netherCreator.type(WorldType.NORMAL);  // Tipo de Nether por defecto
+        netherCreator.type(WorldType.NORMAL);
         netherCreator.generateStructures(true);
-
         World netherWorld = Bukkit.createWorld(netherCreator);
+
         if (netherWorld != null) {
             player.sendMessage(ChatColor.DARK_RED + "Nether world 'world_nether' created successfully.");
         } else {
@@ -208,7 +173,6 @@ public class WorldMenu implements Listener {
         }
     }
 
-    // Método para cargar los chunks del Nether
     public static void loadNetherChunks(Player player) {
         Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "wb world_nether set " + NUHC.getInstance().getGameConfig().getBorder() + " " + NUHC.getInstance().getGameConfig().getBorder() + " 0 0");
         Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "wb world_nether fill 125");
@@ -216,7 +180,6 @@ public class WorldMenu implements Listener {
         player.sendMessage(ChatColor.DARK_RED + "Nether chunks are being loaded.");
     }
 
-    // Método para teletransportarse a una ubicación aleatoria en el Nether
     public static void teleportToRandomNether(Player player) {
         World netherWorld = Bukkit.getWorld("world_nether");
         if (netherWorld == null) {
@@ -225,22 +188,20 @@ public class WorldMenu implements Listener {
         }
 
         Random random = new Random();
-        int x = random.nextInt(10000) - 5000; // Coordenadas X aleatorias entre -5000 y 5000
-        int z = random.nextInt(10000) - 5000; // Coordenadas Z aleatorias entre -5000 y 5000
+        int x = random.nextInt(10000) - 5000;
+        int z = random.nextInt(10000) - 5000;
 
-        // Iniciar la búsqueda desde y = 120 para evitar el techo del Nether
-        for (int y = 120; y > 10; y--) { // Bajamos desde el techo hasta un nivel más bajo
+        for (int y = 120; y > 10; y--) {
             Location location = new Location(netherWorld, x, y, z);
             Location below = location.clone().subtract(0, 1, 0);
             Location above = location.clone().add(0, 1, 0);
 
             if (location.getBlock().getType() == Material.AIR && above.getBlock().getType() == Material.AIR && below.getBlock().getType().isSolid()) {
-                player.teleport(location.add(0, 1, 0)); // Teletransportarse al lugar adecuado
+                player.teleport(location.add(0, 1, 0));
                 player.sendMessage(ChatColor.RED + "Teleported to a random location in the Nether!");
                 return;
             }
         }
-
         player.sendMessage(ChatColor.RED + "Failed to find a safe location in the Nether.");
     }
 }

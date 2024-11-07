@@ -13,12 +13,11 @@ public class TeamChatCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage("This command can only be executed by players.");
+            sender.sendMessage(ChatColor.RED + "This command can only be executed by players.");
             return true;
         }
 
         Player player = (Player) sender;
-
         if (args.length == 0) {
             player.sendMessage(ChatColor.RED + "You must write a message to send to your team.");
             return true;
@@ -31,13 +30,13 @@ public class TeamChatCommand implements CommandExecutor {
         }
 
         String message = String.join(" ", args);
-
         sendTeamMessage(player, playerTeam, message);
         return true;
     }
 
     private void sendTeamMessage(Player player, UHCTeam team, String message) {
-        team.broadcast(ChatColor.AQUA + "[TeamChat] " + ChatColor.WHITE + player.getName() + ": " + message);
-        player.sendMessage(ChatColor.AQUA + "[TeamChat] " + ChatColor.WHITE + "Your message was sent to the team.");
+        String formattedMessage = ChatColor.AQUA + "[TeamChat] " + ChatColor.WHITE + player.getName() + ": " + message;
+        team.broadcast(formattedMessage);
+        player.sendMessage(ChatColor.GREEN + "Your message was sent to the team.");
     }
 }

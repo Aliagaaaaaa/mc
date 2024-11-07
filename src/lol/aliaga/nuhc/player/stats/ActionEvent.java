@@ -1,28 +1,19 @@
 package lol.aliaga.nuhc.player.stats;
 
-import lombok.Getter;
-
 import java.time.LocalDateTime;
 
 public class ActionEvent {
 
-    @Getter
-    private final String actionType;  // Type of action (mining, damage, death, etc.)
-
-    @Getter
-    private final String detail;  // Specific detail (diamond, gold, player damage, etc.)
-
-    @Getter
-    private final int amount;  // Quantity involved (blocks mined, damage, etc.)
-
-    @Getter
-    private final LocalDateTime timestamp;  // Timestamp of when the action occurred
+    private final String actionType;
+    private final String detail;
+    private final int amount;
+    private final LocalDateTime timestamp;
 
     public ActionEvent(String actionType, String detail, int amount) {
         this.actionType = actionType;
         this.detail = detail;
         this.amount = amount;
-        this.timestamp = LocalDateTime.now();  // Record the current time
+        this.timestamp = LocalDateTime.now();
     }
 
     @Override

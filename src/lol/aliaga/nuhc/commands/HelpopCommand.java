@@ -17,7 +17,6 @@ public class HelpopCommand implements CommandExecutor {
         }
 
         String message = String.join(" ", args);
-
         if (sender instanceof Player) {
             Player player = (Player) sender;
             String helpopMessage = ChatColor.GOLD + "[HelpOp] " + ChatColor.YELLOW + player.getName() + ": " + ChatColor.WHITE + message;
